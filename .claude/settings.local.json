@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(brew list *)",
+      "Bash(/opt/homebrew/bin/node -v)",
+      "Bash(/opt/homebrew/bin/npm -v)",
+      "Bash(ls -la ~/Desktop/ever-after 2>&1)"
+    ]
+  }
+}
