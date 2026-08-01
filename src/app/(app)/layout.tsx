@@ -32,6 +32,11 @@ export default async function AppLayout({
             Ever After
           </Link>
           <div className="flex items-center gap-4">
+            {profile?.global_role === "account" && (
+              <Link href="/vendors" className="text-sm text-neutral-500 hover:text-neutral-900">
+                Vendors
+              </Link>
+            )}
             <span className="text-sm text-neutral-500">
               {profile?.full_name || user.email} ·{" "}
               {profile?.global_role ?? "no role"}
