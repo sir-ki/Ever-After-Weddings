@@ -35,6 +35,16 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/login") ||
     request.nextUrl.pathname.startsWith("/auth");
 
+  // Guests are never logged in — the token in the URL is their
+  // credential. These routes must stay reachable without a session.
+  const isPublicGuestRoute =
+    request.nextUrl.pathname.startsWith("/r/") ||
+    request.nextUrl.pathname.startsWith("/api/g/");
+
+  if (isPublicGuestRoute) {
+    return supabaseResponse;
+  }
+
   if (!user && !isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";

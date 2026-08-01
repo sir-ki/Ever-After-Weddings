@@ -52,7 +52,7 @@ export default async function GuestListTab({
   let query = supabase
     .from("guests")
     .select(
-      "id, full_name, side, guest_group, contact_phone, rsvp_status, archived_at",
+      "id, full_name, side, guest_group, contact_phone, rsvp_status, archived_at, invite_token",
     )
     .eq("engagement_id", engagementId)
     .order("full_name", { ascending: true });
@@ -203,6 +203,13 @@ export default async function GuestListTab({
                     <div className="flex items-center justify-end gap-3">
                       {!showArchived ? (
                         <>
+                          <Link
+                            href={`/r/${guest.invite_token}`}
+                            target="_blank"
+                            className="text-sm text-neutral-500 hover:text-neutral-900 hover:underline"
+                          >
+                            RSVP link ↗
+                          </Link>
                           <Link
                             href={`/engagements/${engagementId}/guests/${guest.id}/edit`}
                             className="text-sm text-neutral-500 hover:text-neutral-900 hover:underline"
