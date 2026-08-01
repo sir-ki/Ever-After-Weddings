@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getGuestByToken, isPastDeadline } from "@/lib/guest-token";
+import { createAdminClient } from "@/lib/supabase/admin";
 import RsvpForm from "./rsvp-form";
 
 function formatDate(date: string | null) {
@@ -27,6 +28,14 @@ export default async function GuestRsvpPage({
   const { guest, engagement } = result;
   const deadlinePassed = isPastDeadline(engagement.rsvp_deadline);
 
+  const { data: site } = await createAdminClient()
+    .from("sites")
+    .select("day_hub_unlocked_at")
+    .eq("engagement_id", result.engagementId)
+    .maybeSingle();
+  const hubUnlocked =
+    !!site?.day_hub_unlocked_at && new Date(site.day_hub_unlocked_at) <= new Date();
+
   return (
     <div className="min-h-screen bg-rose-50 px-4 py-12">
       <div className="mx-auto max-w-md rounded-lg border border-rose-100 bg-white p-8 shadow-sm">
@@ -50,7 +59,12 @@ export default async function GuestRsvpPage({
         <p className="text-sm text-neutral-500">Hi</p>
         <p className="text-lg font-medium text-neutral-900">{guest.full_name}</p>
 
-        <RsvpForm token={token} guest={guest} deadlinePassed={deadlinePassed} />
+        <RsvpForm
+          token={token}
+          guest={guest}
+          deadlinePassed={deadlinePassed}
+          hubUnlocked={hubUnlocked}
+        />
       </div>
     </div>
   );

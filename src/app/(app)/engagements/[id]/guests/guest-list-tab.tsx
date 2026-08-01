@@ -211,6 +211,13 @@ export default async function GuestListTab({
                             RSVP link ↗
                           </Link>
                           <Link
+                            href={`/r/${guest.invite_token}/day`}
+                            target="_blank"
+                            className="text-sm text-neutral-500 hover:text-neutral-900 hover:underline"
+                          >
+                            Day hub ↗
+                          </Link>
+                          <Link
                             href={`/engagements/${engagementId}/guests/${guest.id}/edit`}
                             className="text-sm text-neutral-500 hover:text-neutral-900 hover:underline"
                           >

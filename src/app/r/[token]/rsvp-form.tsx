@@ -9,10 +9,12 @@ export default function RsvpForm({
   token,
   guest,
   deadlinePassed,
+  hubUnlocked,
 }: {
   token: string;
   guest: PublicGuest;
   deadlinePassed: boolean;
+  hubUnlocked: boolean;
 }) {
   const initialStatus =
     guest.rsvp_status === "accepted" || guest.rsvp_status === "declined"
@@ -44,6 +46,14 @@ export default function RsvpForm({
           </p>
         )}
         <p className="mt-1">Need to change your answer? Message the couple directly.</p>
+        {hubUnlocked && (
+          <a
+            href={`/r/${token}/day`}
+            className="mt-3 inline-block font-medium text-neutral-900 hover:underline"
+          >
+            Open the day-of hub →
+          </a>
+        )}
       </div>
     );
   }
@@ -100,10 +110,18 @@ export default function RsvpForm({
             </p>
           </>
         )}
+        {hubUnlocked && (
+          <a
+            href={`/r/${token}/day`}
+            className="mt-4 block font-medium text-neutral-900 hover:underline"
+          >
+            Open the day-of hub →
+          </a>
+        )}
         <button
           type="button"
           onClick={() => setStage("details")}
-          className="mt-4 text-sm text-neutral-500 hover:underline"
+          className="mt-3 text-sm text-neutral-500 hover:underline"
         >
           Need to change your answer?
         </button>
