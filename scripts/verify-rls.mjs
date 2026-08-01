@@ -235,11 +235,24 @@ const { data: secondAccount, error: secondAccountError } =
     email: secondAccountEmail,
     password: secondAccountPassword,
     email_confirm: true,
-    user_metadata: { full_name: "RLS Test Account", global_role: "account" },
+    user_metadata: { full_name: "RLS Test Account" },
   });
 
 if (secondAccountError) {
   console.error("Failed to create second account user:", secondAccountError.message);
+  process.exit(1);
+}
+
+// handle_new_user() always inserts new rows as 'couple' (migration
+// 0007) — promote this fixture the same way create-account-user.mjs
+// does, via a direct update rather than trusted signup metadata.
+const { error: promoteSecondAccountError } = await admin
+  .from("users")
+  .update({ global_role: "account" })
+  .eq("id", secondAccount.user.id);
+
+if (promoteSecondAccountError) {
+  console.error("Failed to promote second account user:", promoteSecondAccountError.message);
   process.exit(1);
 }
 

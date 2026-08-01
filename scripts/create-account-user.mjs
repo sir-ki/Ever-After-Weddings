@@ -23,12 +23,24 @@ const { data, error } = await supabase.auth.admin.createUser({
   email_confirm: true,
   user_metadata: {
     full_name: fullName || "",
-    global_role: "account",
   },
 });
 
 if (error) {
   console.error("Failed to create user:", error.message);
+  process.exit(1);
+}
+
+// handle_new_user() always inserts new rows as 'couple' — signup-time
+// metadata is never trusted for role assignment (see migration 0007).
+// Promoting to 'account' is a separate, explicit step here.
+const { error: promoteError } = await supabase
+  .from("users")
+  .update({ global_role: "account" })
+  .eq("id", data.user.id);
+
+if (promoteError) {
+  console.error("User created but failed to promote to account:", promoteError.message);
   process.exit(1);
 }
 
