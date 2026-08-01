@@ -5,6 +5,7 @@ import GuestListTab from "./guests/guest-list-tab";
 import TablesTab from "./tables/tables-tab";
 import SiteTab from "./site/site-tab";
 import DayOfTab from "./day-of/day-of-tab";
+import CheckpointsTab from "./checkpoints/checkpoints-tab";
 
 const TABS = [
   { key: "overview", label: "Overview" },
@@ -151,6 +152,8 @@ export default async function EngagementWorkspacePage({
         <SiteTab engagementId={id} searchParams={resolvedSearchParams} />
       ) : activeTab.key === "day-of" ? (
         <DayOfTab engagementId={id} />
+      ) : activeTab.key === "checkpoints" ? (
+        <CheckpointsTab engagementId={id} />
       ) : (
         <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center">
           <p className="text-sm text-neutral-500">
