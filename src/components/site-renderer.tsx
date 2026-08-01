@@ -35,6 +35,13 @@ export type DetailsContent = {
   parking_note?: string;
   faq?: { question: string; answer: string }[];
 };
+export type SuppliersContent = { heading?: string };
+export type SupplierCredit = {
+  business_name: string;
+  category: string;
+  contact_phone: string | null;
+  contact_email: string | null;
+};
 
 export type SiteSectionRow = {
   section_type: string;
@@ -64,10 +71,12 @@ export default function SiteRenderer({
   sections,
   fallbackHeadline,
   weddingDate,
+  suppliers,
 }: {
   sections: SiteSectionRow[];
   fallbackHeadline: string;
   weddingDate: string | null;
+  suppliers: SupplierCredit[];
 }) {
   const byType = new Map(sections.map((s) => [s.section_type, s]));
 
@@ -104,6 +113,10 @@ export default function SiteRenderer({
       detailsContent.parking_note ||
       (detailsContent.faq?.length ?? 0) > 0
     );
+
+  const suppliersSection = byType.get("suppliers");
+  const suppliersContent = (suppliersSection?.content ?? {}) as SuppliersContent;
+  const showSuppliers = suppliersSection?.is_visible && suppliers.length > 0;
 
   const days = heroContent.show_countdown ? daysUntil(weddingDate) : null;
 
@@ -222,6 +235,26 @@ export default function SiteRenderer({
               )}
             </div>
           </div>
+        </section>
+      )}
+
+      {showSuppliers && (
+        <section className="mx-auto max-w-2xl px-6 py-16">
+          <h2 className="mb-4 text-2xl font-semibold text-neutral-900">
+            {suppliersContent.heading || "Suppliers"}
+          </h2>
+          <ul className="space-y-3 text-neutral-700">
+            {suppliers.map((s, i) => (
+              <li key={i}>
+                <p className="font-medium text-neutral-900">{s.business_name}</p>
+                <p className="text-sm text-neutral-500">
+                  {s.category}
+                  {s.contact_phone ? ` · ${s.contact_phone}` : ""}
+                  {s.contact_email ? ` · ${s.contact_email}` : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
     </div>

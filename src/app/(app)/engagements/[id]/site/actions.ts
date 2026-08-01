@@ -106,6 +106,11 @@ export async function createSite(formData: FormData) {
         faq: [],
       },
     },
+    {
+      section_type: "suppliers",
+      sort_order: 6,
+      content: { heading: "Suppliers" },
+    },
   ];
 
   await supabase
@@ -178,10 +183,22 @@ function buildSectionContent(sectionType: string, formData: FormData): any {
         faq,
       };
     }
+    case "suppliers":
+      return { heading: (formData.get("heading") as string) || "Suppliers" };
     default:
       return {};
   }
 }
+
+const SECTION_SORT_ORDER: Record<string, number> = {
+  hero: 0,
+  story: 1,
+  the_day: 2,
+  rsvp: 3,
+  gallery: 4,
+  details: 5,
+  suppliers: 6,
+};
 
 export async function updateSiteSection(formData: FormData) {
   const engagementId = formData.get("engagement_id") as string;
@@ -192,11 +209,16 @@ export async function updateSiteSection(formData: FormData) {
   const content = buildSectionContent(sectionType, formData);
 
   const supabase = await createClient();
-  await supabase
-    .from("site_sections")
-    .update({ content, is_visible: isVisible })
-    .eq("site_id", siteId)
-    .eq("section_type", sectionType);
+  await supabase.from("site_sections").upsert(
+    {
+      site_id: siteId,
+      section_type: sectionType,
+      content,
+      is_visible: isVisible,
+      sort_order: SECTION_SORT_ORDER[sectionType] ?? 99,
+    },
+    { onConflict: "site_id,section_type" },
+  );
 
   revalidatePath(`/engagements/${engagementId}`);
 }

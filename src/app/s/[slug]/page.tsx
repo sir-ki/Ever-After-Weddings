@@ -56,6 +56,12 @@ export default async function PublicSitePage({
     .eq("site_id", site.id)
     .order("sort_order");
 
+  const { data: suppliers } = await supabase
+    .from("engagement_vendors")
+    .select("business_name, category, contact_phone, contact_email")
+    .eq("engagement_id", site.engagement_id)
+    .eq("credit_on_site", true);
+
   return (
     <>
       {site.status === "draft" && (
@@ -67,6 +73,7 @@ export default async function PublicSitePage({
         sections={sections ?? []}
         fallbackHeadline={engagement.display_name}
         weddingDate={engagement.wedding_date}
+        suppliers={suppliers ?? []}
       />
     </>
   );

@@ -7,6 +7,7 @@ import SiteRenderer, {
   type RsvpContent,
   type GalleryContent,
   type DetailsContent,
+  type SuppliersContent,
 } from "@/components/site-renderer";
 import {
   createSite,
@@ -82,6 +83,12 @@ export default async function SiteTab({
 
   const sections = sectionsRaw ?? [];
 
+  const { data: creditedSuppliers } = await supabase
+    .from("engagement_vendors")
+    .select("business_name, category, contact_phone, contact_email")
+    .eq("engagement_id", engagementId)
+    .eq("credit_on_site", true);
+
   if (!isAccount) {
     return (
       <div>
@@ -111,6 +118,7 @@ export default async function SiteTab({
             sections={sections}
             fallbackHeadline={engagement?.display_name ?? ""}
             weddingDate={engagement?.wedding_date ?? null}
+            suppliers={creditedSuppliers ?? []}
           />
         </div>
       </div>
@@ -129,6 +137,8 @@ export default async function SiteTab({
   const galleryContent = (gallery?.content ?? {}) as GalleryContent;
   const details = find(sections, "details");
   const detailsContent = (details?.content ?? {}) as DetailsContent;
+  const suppliers = find(sections, "suppliers");
+  const suppliersContent = (suppliers?.content ?? {}) as SuppliersContent;
 
   const inputClass =
     "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none";
@@ -584,6 +594,46 @@ export default async function SiteTab({
               className={`${inputClass} font-mono`}
             />
           </div>
+        </div>
+        <button
+          type="submit"
+          className="mt-4 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+        >
+          Save
+        </button>
+      </form>
+
+      {/* Suppliers */}
+      <form
+        action={updateSiteSection}
+        className="rounded-lg border border-neutral-200 bg-white p-4"
+      >
+        <input type="hidden" name="engagement_id" value={engagementId} />
+        <input type="hidden" name="site_id" value={site.id} />
+        <input type="hidden" name="section_type" value="suppliers" />
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-medium text-neutral-900">Suppliers</h3>
+          <label className="flex items-center gap-2 text-xs text-neutral-500">
+            <input
+              type="checkbox"
+              name="is_visible"
+              defaultChecked={suppliers?.is_visible ?? true}
+            />
+            Visible
+          </label>
+        </div>
+        <p className="mb-4 text-xs text-neutral-400">
+          Credits suppliers marked &ldquo;credit on site&rdquo; in the Vendors tab. No
+          ratings, no reviews — just a credit list.
+        </p>
+        <div>
+          <label className={labelClass}>Heading</label>
+          <input
+            name="heading"
+            type="text"
+            defaultValue={suppliersContent.heading}
+            className={inputClass}
+          />
         </div>
         <button
           type="submit"
