@@ -1,0 +1,144 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+
+const TABS = [
+  { key: "overview", label: "Overview" },
+  { key: "guests", label: "Guest List", milestone: 2 },
+  { key: "tables", label: "Tables & Seating", milestone: 4 },
+  { key: "website", label: "Website", milestone: 5 },
+  { key: "day-of", label: "Day-of Hub", milestone: 6 },
+  { key: "checkpoints", label: "Checkpoints", milestone: 7 },
+  { key: "vendors", label: "Vendors", milestone: 8 },
+] as const;
+
+const STAGE_LABELS: Record<string, string> = {
+  onboarding: "Onboarding",
+  building: "Building",
+  live: "Live",
+  post_wedding: "Post-wedding",
+  archived: "Archived",
+};
+
+function formatDate(date: string | null) {
+  if (!date) return "No date set";
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+export default async function EngagementWorkspacePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { id } = await params;
+  const { tab = "overview" } = await searchParams;
+  const supabase = await createClient();
+
+  const { data: engagement } = await supabase
+    .from("engagements")
+    .select(
+      "id, display_name, partner_a_name, partner_b_name, wedding_date, stage, ceremony_venue, reception_venue, expected_guest_count, guest_cap, assigned_to_profile:users!engagements_assigned_to_fkey(full_name)",
+    )
+    .eq("id", id)
+    .single();
+
+  if (!engagement) {
+    notFound();
+  }
+
+  const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
+  const assignedName =
+    (
+      engagement.assigned_to_profile as unknown as {
+        full_name: string | null;
+      } | null
+    )?.full_name || "Unassigned";
+
+  return (
+    <div>
+      <div className="mb-6">
+        <Link href="/" className="text-sm text-neutral-500 hover:underline">
+          ← Engagements
+        </Link>
+        <div className="mt-2 flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-neutral-900">
+            {engagement.display_name}
+          </h1>
+          <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-700">
+            {STAGE_LABELS[engagement.stage] ?? engagement.stage}
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-neutral-500">
+          {formatDate(engagement.wedding_date)} · Assigned to {assignedName}
+        </p>
+      </div>
+
+      <div className="mb-6 flex gap-1 border-b border-neutral-200">
+        {TABS.map((t) => (
+          <Link
+            key={t.key}
+            href={`/engagements/${id}?tab=${t.key}`}
+            className={`border-b-2 px-3 py-2 text-sm font-medium ${
+              activeTab.key === t.key
+                ? "border-neutral-900 text-neutral-900"
+                : "border-transparent text-neutral-500 hover:text-neutral-700"
+            }`}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </div>
+
+      {activeTab.key === "overview" ? (
+        <dl className="grid grid-cols-2 gap-x-8 gap-y-4 rounded-lg border border-neutral-200 bg-white p-6 text-sm">
+          <div>
+            <dt className="text-neutral-500">Partner A</dt>
+            <dd className="mt-1 text-neutral-900">
+              {engagement.partner_a_name || "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-neutral-500">Partner B</dt>
+            <dd className="mt-1 text-neutral-900">
+              {engagement.partner_b_name || "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-neutral-500">Ceremony venue</dt>
+            <dd className="mt-1 text-neutral-900">
+              {engagement.ceremony_venue || "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-neutral-500">Reception venue</dt>
+            <dd className="mt-1 text-neutral-900">
+              {engagement.reception_venue || "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-neutral-500">Expected guests</dt>
+            <dd className="mt-1 text-neutral-900">
+              {engagement.expected_guest_count ?? "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-neutral-500">Guest cap</dt>
+            <dd className="mt-1 text-neutral-900">{engagement.guest_cap}</dd>
+          </div>
+        </dl>
+      ) : (
+        <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center">
+          <p className="text-sm text-neutral-500">
+            {activeTab.label} lands in Milestone {activeTab.milestone}.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
