@@ -36,6 +36,7 @@ export async function updateGuest(formData: FormData) {
   const engagementId = formData.get("engagement_id") as string;
   const guestId = formData.get("guest_id") as string;
   const rsvpStatus = formData.get("rsvp_status") as string;
+  const tableId = (formData.get("table_id") as string) || null;
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -45,6 +46,7 @@ export async function updateGuest(formData: FormData) {
       rsvp_status: rsvpStatus,
       rsvp_responded_at:
         rsvpStatus === "no_reply" ? null : new Date().toISOString(),
+      table_id: tableId,
     })
     .eq("id", guestId);
 
@@ -55,6 +57,17 @@ export async function updateGuest(formData: FormData) {
   }
 
   redirect(`/engagements/${engagementId}?tab=guests`);
+}
+
+export async function assignGuestTable(formData: FormData) {
+  const engagementId = formData.get("engagement_id") as string;
+  const guestId = formData.get("guest_id") as string;
+  const tableId = (formData.get("table_id") as string) || null;
+  const supabase = await createClient();
+
+  await supabase.from("guests").update({ table_id: tableId }).eq("id", guestId);
+
+  revalidatePath(`/engagements/${engagementId}`);
 }
 
 export async function archiveGuest(formData: FormData) {

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import GuestListTab from "./guests/guest-list-tab";
+import TablesTab from "./tables/tables-tab";
 
 const TABS = [
   { key: "overview", label: "Overview" },
@@ -136,6 +137,8 @@ export default async function EngagementWorkspacePage({
         </dl>
       ) : activeTab.key === "guests" ? (
         <GuestListTab engagementId={id} searchParams={resolvedSearchParams} />
+      ) : activeTab.key === "tables" ? (
+        <TablesTab engagementId={id} />
       ) : (
         <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center">
           <p className="text-sm text-neutral-500">

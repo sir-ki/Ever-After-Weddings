@@ -17,7 +17,7 @@ export default async function EditGuestPage({
   const { data: guest } = await supabase
     .from("guests")
     .select(
-      "id, full_name, side, guest_group, contact_phone, guest_notes, rsvp_status",
+      "id, full_name, side, guest_group, contact_phone, guest_notes, rsvp_status, table_id",
     )
     .eq("id", guestId)
     .eq("engagement_id", id)
@@ -26,6 +26,12 @@ export default async function EditGuestPage({
   if (!guest) {
     notFound();
   }
+
+  const { data: tables } = await supabase
+    .from("tables")
+    .select("id, label")
+    .eq("engagement_id", id)
+    .order("sort_order");
 
   return (
     <div className="max-w-lg">
@@ -130,6 +136,28 @@ export default async function EditGuestPage({
               <option value="declined">Declined</option>
             </select>
           </div>
+        </div>
+
+        <div>
+          <label
+            htmlFor="table_id"
+            className="mb-1 block text-sm font-medium text-neutral-700"
+          >
+            Table
+          </label>
+          <select
+            id="table_id"
+            name="table_id"
+            defaultValue={guest.table_id ?? ""}
+            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+          >
+            <option value="">Unassigned</option>
+            {tables?.map((table) => (
+              <option key={table.id} value={table.id}>
+                {table.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
