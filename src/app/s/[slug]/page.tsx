@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import SiteRenderer from "@/components/site-renderer";
 
 export default async function PublicSitePage({
@@ -11,15 +12,23 @@ export default async function PublicSitePage({
 
   const { data: site } = await supabase
     .from("sites")
-    .select(
-      "id, status, engagements(display_name, wedding_date)",
-    )
+    .select("id, status, engagement_id")
     .eq("slug", slug)
     .maybeSingle();
 
-  const engagement = site?.engagements as unknown as
-    | { display_name: string; wedding_date: string | null }
-    | null;
+  // engagements has no "published" read carve-out in its own RLS —
+  // rightly so, since a full engagement row holds internal fields
+  // (notes, assigned_to, guest_cap) that a public visitor must never
+  // see. The site row above already proves this request is allowed
+  // (its RLS passed), so this is a narrow, hand-built lookup of only
+  // the two public-safe fields, not a broadened engagements policy.
+  const { data: engagement } = site
+    ? await createAdminClient()
+        .from("engagements")
+        .select("display_name, wedding_date")
+        .eq("id", site.engagement_id)
+        .maybeSingle()
+    : { data: null };
 
   // Never a 404, never a stack trace — a neutral holding page, per
   // docs/ever-after-template-spec.md §6. `site` comes back null here
