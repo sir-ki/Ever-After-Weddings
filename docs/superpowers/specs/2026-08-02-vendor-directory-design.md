@@ -205,6 +205,16 @@ that inserts one `vendors` row (`status = 'pending'`) and any
 confirmation, no password. Confirmation screen: "Thanks — we'll be in
 touch once it's reviewed," no dead-end 200 with no feedback.
 
+**RLS note caught during planning**: the visitor submitting this form has
+no session, so `is_account()` is false and `vendors_write_account` alone
+would reject the insert. This action uses `createAdminClient()` for the
+insert, narrowly — the same established pattern as guest RSVP writes
+(`/api/g/[token]/rsvp`), for the same reason: a genuinely public,
+unauthenticated write that's supposed to bypass RLS by design. `status`
+is hardcoded to `'pending'` server-side and never taken from form input,
+exactly like `guest-token.ts` never trusts a client-supplied field for
+anything access-control-relevant.
+
 **Account approval queue** (`/vendors`, inside `(app)`): gated by
 `profile.global_role !== 'account' → redirect("/")`, identical to
 `engagements/new/page.tsx`'s existing pattern. Lists `pending` vendors.
