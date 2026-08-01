@@ -173,10 +173,21 @@ create policy vendor_photos_read on vendor_photos for select
 create policy vendor_photos_write_account on vendor_photos for all
   using (is_account()) with check (is_account());
 
+-- Split by operation (not one `for all`), same pattern sites/site_sections
+-- already use: the auth doc's permission matrix says engagement_vendors is
+-- "credited only" for both guest-token holders and the public — the public
+-- wedding site's suppliers section needs to read credited rows with no
+-- session at all, so read needs its own, broader policy than write.
 alter table engagement_vendors enable row level security;
-create policy engagement_vendors_all on engagement_vendors for all
+create policy engagement_vendors_read on engagement_vendors for select
+  using (is_account() or has_engagement(engagement_id) or credit_on_site = true);
+create policy engagement_vendors_insert on engagement_vendors for insert
+  with check (is_account() or has_engagement(engagement_id));
+create policy engagement_vendors_update on engagement_vendors for update
   using (is_account() or has_engagement(engagement_id))
   with check (is_account() or has_engagement(engagement_id));
+create policy engagement_vendors_delete on engagement_vendors for delete
+  using (is_account() or has_engagement(engagement_id));
 ```
 
 No `owner_user_id`-based write policy in this pass (would need
@@ -259,11 +270,17 @@ editor UI or renderer yet. This pass adds:
   "Suppliers" per the template spec) — the section's actual *content* is
   computed, not edited (see below), so the editor is just visibility +
   heading, same shape as other lightweight sections.
-- A renderer case in `site-renderer.tsx` that queries
-  `engagement_vendors` where `credit_on_site = true` for this engagement
-  and renders business name, category, and contact — a straight credit
-  list, no ratings, per the template spec (`docs/ever-after-template-spec.md`
-  §3.8).
+- A renderer case in `site-renderer.tsx`. `SiteRenderer` is a pure
+  presentational component today — it takes already-fetched `sections` as
+  a prop and does no querying of its own, shared verbatim between
+  `/s/[slug]/page.tsx` (public) and `site-tab.tsx` (couple/Account
+  preview) specifically so both surfaces always render identically. This
+  pass keeps that shape: both callers fetch `engagement_vendors` where
+  `credit_on_site = true` (now readable with no session at all, per the
+  RLS fix above) and pass the result in as a new `suppliers` prop, which
+  `SiteRenderer` renders as business name, category, and contact — a
+  straight credit list, no ratings, per the template spec
+  (`docs/ever-after-template-spec.md` §3.8).
 
 ## Testing / verification
 
