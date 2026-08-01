@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import GuestListTab from "./guests/guest-list-tab";
 
 const TABS = [
   { key: "overview", label: "Overview" },
@@ -34,10 +35,11 @@ export default async function EngagementWorkspacePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; status?: string; group?: string; archived?: string }>;
 }) {
   const { id } = await params;
-  const { tab = "overview" } = await searchParams;
+  const resolvedSearchParams = await searchParams;
+  const { tab = "overview" } = resolvedSearchParams;
   const supabase = await createClient();
 
   const { data: engagement } = await supabase
@@ -132,6 +134,8 @@ export default async function EngagementWorkspacePage({
             <dd className="mt-1 text-neutral-900">{engagement.guest_cap}</dd>
           </div>
         </dl>
+      ) : activeTab.key === "guests" ? (
+        <GuestListTab engagementId={id} searchParams={resolvedSearchParams} />
       ) : (
         <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center">
           <p className="text-sm text-neutral-500">

@@ -1,8 +1,9 @@
 // The one-question checklist from the build plan: "couple A cannot see
 // couple B's data." Creates a throwaway couple user attached to one seed
 // engagement, signs in as them, and confirms they see exactly that
-// engagement and nothing else — including a direct id lookup of the other.
-// Usage: node --env-file=.env.local scripts/verify-engagement-rls.mjs
+// engagement (and its guests) and nothing else — including direct id
+// lookups against the other engagement.
+// Usage: node --env-file=.env.local scripts/verify-rls.mjs
 import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -58,6 +59,25 @@ await admin.from("engagement_members").insert({
   role: "partner",
 });
 
+const { data: mariaJonGuest } = await admin
+  .from("guests")
+  .insert({
+    engagement_id: mariaJon.id,
+    full_name: "RLS Test Guest (Maria & Jon)",
+    side: "both",
+  })
+  .select("id")
+  .single();
+const { data: erickErikaGuest } = await admin
+  .from("guests")
+  .insert({
+    engagement_id: erickErika.id,
+    full_name: "RLS Test Guest (Erick & Erika)",
+    side: "both",
+  })
+  .select("id")
+  .single();
+
 try {
   const asCouple = createClient(url, anonKey);
   const { error: signInError } = await asCouple.auth.signInWithPassword({
@@ -103,7 +123,40 @@ try {
     "couple cannot write to engagements (Account-only per RLS)",
     afterWrite?.notes !== "should not be allowed",
   );
+
+  const { data: visibleGuests } = await asCouple
+    .from("guests")
+    .select("id, engagement_id");
+  const visibleGuestIds = new Set(visibleGuests?.map((g) => g.id));
+  check(
+    "couple's guest list contains only their own engagement's guests",
+    visibleGuests?.every((g) => g.engagement_id === mariaJon.id) &&
+      visibleGuestIds.has(mariaJonGuest.id) &&
+      !visibleGuestIds.has(erickErikaGuest.id),
+  );
+
+  const { data: ownGuestFetch } = await asCouple
+    .from("guests")
+    .select("id")
+    .eq("id", mariaJonGuest.id)
+    .maybeSingle();
+  check(
+    "couple can fetch their own guest by id",
+    ownGuestFetch?.id === mariaJonGuest.id,
+  );
+
+  const { data: otherGuestFetch } = await asCouple
+    .from("guests")
+    .select("id")
+    .eq("id", erickErikaGuest.id)
+    .maybeSingle();
+  check(
+    "couple cannot fetch the other engagement's guest by id",
+    otherGuestFetch === null,
+  );
 } finally {
+  await admin.from("guests").delete().eq("id", mariaJonGuest.id);
+  await admin.from("guests").delete().eq("id", erickErikaGuest.id);
   await admin.from("engagement_members").delete().eq("user_id", testUserId);
   await admin.auth.admin.deleteUser(testUserId);
 }
