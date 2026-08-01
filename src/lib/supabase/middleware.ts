@@ -37,11 +37,15 @@ export async function updateSession(request: NextRequest) {
 
   // Guests are never logged in — the token in the URL is their
   // credential. These routes must stay reachable without a session.
-  const isPublicGuestRoute =
+  // /s/[slug] is the public wedding site: anonymous visitors see
+  // published sites (RLS-gated), while a logged-in Account/couple
+  // still gets their session cookies here to preview a draft.
+  const isPublicRoute =
     request.nextUrl.pathname.startsWith("/r/") ||
-    request.nextUrl.pathname.startsWith("/api/g/");
+    request.nextUrl.pathname.startsWith("/api/g/") ||
+    request.nextUrl.pathname.startsWith("/s/");
 
-  if (isPublicGuestRoute) {
+  if (isPublicRoute) {
     return supabaseResponse;
   }
 

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import GuestListTab from "./guests/guest-list-tab";
 import TablesTab from "./tables/tables-tab";
+import SiteTab from "./site/site-tab";
 
 const TABS = [
   { key: "overview", label: "Overview" },
@@ -36,7 +37,13 @@ export default async function EngagementWorkspacePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string; status?: string; group?: string; archived?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    status?: string;
+    group?: string;
+    archived?: string;
+    error?: string;
+  }>;
 }) {
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
@@ -139,6 +146,8 @@ export default async function EngagementWorkspacePage({
         <GuestListTab engagementId={id} searchParams={resolvedSearchParams} />
       ) : activeTab.key === "tables" ? (
         <TablesTab engagementId={id} />
+      ) : activeTab.key === "website" ? (
+        <SiteTab engagementId={id} searchParams={resolvedSearchParams} />
       ) : (
         <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center">
           <p className="text-sm text-neutral-500">

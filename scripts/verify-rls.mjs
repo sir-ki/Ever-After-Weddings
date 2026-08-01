@@ -154,6 +154,72 @@ try {
     "couple cannot fetch the other engagement's guest by id",
     otherGuestFetch === null,
   );
+
+  // Milestone 5's explicit test: logged in as the couple, attempt to
+  // write to sites and site_sections directly. Both must fail.
+  const { data: mariaJonSite } = await admin
+    .from("sites")
+    .select("id")
+    .eq("engagement_id", mariaJon.id)
+    .maybeSingle();
+
+  if (mariaJonSite) {
+    const { data: siteRead } = await asCouple
+      .from("sites")
+      .select("id")
+      .eq("id", mariaJonSite.id)
+      .maybeSingle();
+    check("couple can read their own site", siteRead?.id === mariaJonSite.id);
+
+    await asCouple
+      .from("sites")
+      .update({ slug: "hacked-slug" })
+      .eq("id", mariaJonSite.id);
+    const { data: siteAfter } = await admin
+      .from("sites")
+      .select("slug")
+      .eq("id", mariaJonSite.id)
+      .single();
+    check(
+      "couple cannot write to sites (Account-only per RLS)",
+      siteAfter?.slug !== "hacked-slug",
+    );
+
+    const { error: sectionInsertError } = await asCouple
+      .from("site_sections")
+      .insert({ site_id: mariaJonSite.id, section_type: "suppliers", content: {} });
+    check(
+      "couple cannot insert into site_sections (Account-only per RLS)",
+      sectionInsertError !== null,
+    );
+
+    const { data: heroSection } = await admin
+      .from("site_sections")
+      .select("id")
+      .eq("site_id", mariaJonSite.id)
+      .eq("section_type", "hero")
+      .single();
+
+    if (heroSection) {
+      await asCouple
+        .from("site_sections")
+        .update({ content: { headline: "HACKED" } })
+        .eq("id", heroSection.id);
+      const { data: sectionAfter } = await admin
+        .from("site_sections")
+        .select("content")
+        .eq("id", heroSection.id)
+        .single();
+      check(
+        "couple cannot write to site_sections (Account-only per RLS)",
+        sectionAfter?.content?.headline !== "HACKED",
+      );
+    }
+  } else {
+    console.log(
+      "SKIP — no site exists for Maria & Jon yet (create one in the Website tab first).",
+    );
+  }
 } finally {
   await admin.from("guests").delete().eq("id", mariaJonGuest.id);
   await admin.from("guests").delete().eq("id", erickErikaGuest.id);
