@@ -6,6 +6,7 @@ import TablesTab from "./tables/tables-tab";
 import SiteTab from "./site/site-tab";
 import DayOfTab from "./day-of/day-of-tab";
 import CheckpointsTab from "./checkpoints/checkpoints-tab";
+import VendorsTab from "./vendors/vendors-tab";
 
 const TABS = [
   { key: "overview", label: "Overview" },
@@ -154,6 +155,8 @@ export default async function EngagementWorkspacePage({
         <DayOfTab engagementId={id} />
       ) : activeTab.key === "checkpoints" ? (
         <CheckpointsTab engagementId={id} />
+      ) : activeTab.key === "vendors" ? (
+        <VendorsTab engagementId={id} />
       ) : (
         <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center">
           <p className="text-sm text-neutral-500">
