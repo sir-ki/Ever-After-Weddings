@@ -227,6 +227,208 @@ try {
   await admin.auth.admin.deleteUser(testUserId);
 }
 
+// Milestone 8: vendors / vendor_photos / engagement_vendors isolation,
+// including the public-read carve-outs (approved vendors, credited
+// engagement_vendors) that no other script exercises.
+const asAnon = createClient(url, anonKey);
+
+const { data: pendingVendor } = await admin
+  .from("vendors")
+  .insert({ business_name: "RLS Test Pending Vendor", category: "photo" })
+  .select("id")
+  .single();
+const { data: approvedVendor } = await admin
+  .from("vendors")
+  .insert({
+    business_name: "RLS Test Approved Vendor",
+    category: "florals",
+    status: "approved",
+  })
+  .select("id")
+  .single();
+const { data: approvedPhoto } = await admin
+  .from("vendor_photos")
+  .insert({ vendor_id: approvedVendor.id, photo_url: "https://example.com/a.jpg" })
+  .select("id")
+  .single();
+const { data: pendingPhoto } = await admin
+  .from("vendor_photos")
+  .insert({ vendor_id: pendingVendor.id, photo_url: "https://example.com/p.jpg" })
+  .select("id")
+  .single();
+
+const couple2Email = `rls-test-couple2-${Date.now()}@example.com`;
+const couple2Password = "verify-rls-temp-password-1234";
+const { data: created2, error: create2Error } = await admin.auth.admin.createUser({
+  email: couple2Email,
+  password: couple2Password,
+  email_confirm: true,
+  user_metadata: { full_name: "RLS Test Couple 2" },
+});
+if (create2Error) {
+  console.error("Failed to create second test couple:", create2Error.message);
+  process.exit(1);
+}
+const couple2UserId = created2.user.id;
+await admin.from("engagement_members").insert({
+  engagement_id: mariaJon.id,
+  user_id: couple2UserId,
+  role: "partner",
+});
+
+const { data: creditedVendor } = await admin
+  .from("engagement_vendors")
+  .insert({
+    engagement_id: mariaJon.id,
+    business_name: "RLS Test Credited Supplier",
+    category: "cake",
+    credit_on_site: true,
+  })
+  .select("id")
+  .single();
+const { data: uncreditedVendor } = await admin
+  .from("engagement_vendors")
+  .insert({
+    engagement_id: mariaJon.id,
+    business_name: "RLS Test Uncredited Supplier",
+    category: "music",
+    credit_on_site: false,
+  })
+  .select("id")
+  .single();
+const { data: otherEngagementVendor } = await admin
+  .from("engagement_vendors")
+  .insert({
+    engagement_id: erickErika.id,
+    business_name: "RLS Test Erick & Erika Supplier",
+    category: "venue",
+  })
+  .select("id")
+  .single();
+
+try {
+  const asCouple2 = createClient(url, anonKey);
+  const { error: signIn2Error } = await asCouple2.auth.signInWithPassword({
+    email: couple2Email,
+    password: couple2Password,
+  });
+  if (signIn2Error) {
+    console.error("Failed to sign in as second test couple:", signIn2Error.message);
+    process.exit(1);
+  }
+
+  const { data: anonApproved } = await asAnon
+    .from("vendors")
+    .select("id")
+    .eq("id", approvedVendor.id)
+    .maybeSingle();
+  check("anon can read an approved vendor", anonApproved?.id === approvedVendor.id);
+
+  const { data: anonPending } = await asAnon
+    .from("vendors")
+    .select("id")
+    .eq("id", pendingVendor.id)
+    .maybeSingle();
+  check("anon cannot read a pending vendor", anonPending === null);
+
+  const { data: anonApprovedPhoto } = await asAnon
+    .from("vendor_photos")
+    .select("id")
+    .eq("id", approvedPhoto.id)
+    .maybeSingle();
+  check(
+    "anon can read an approved vendor's photos",
+    anonApprovedPhoto?.id === approvedPhoto.id,
+  );
+
+  const { data: anonPendingPhoto } = await asAnon
+    .from("vendor_photos")
+    .select("id")
+    .eq("id", pendingPhoto.id)
+    .maybeSingle();
+  check("anon cannot read a pending vendor's photos", anonPendingPhoto === null);
+
+  await asCouple2
+    .from("vendors")
+    .update({ business_name: "hacked" })
+    .eq("id", approvedVendor.id);
+  const { data: vendorAfterWrite } = await admin
+    .from("vendors")
+    .select("business_name")
+    .eq("id", approvedVendor.id)
+    .single();
+  check(
+    "couple cannot write to vendors (Account-only per RLS)",
+    vendorAfterWrite?.business_name !== "hacked",
+  );
+
+  const { data: ownEngagementVendors } = await asCouple2
+    .from("engagement_vendors")
+    .select("id, engagement_id");
+  const ownIds = new Set(ownEngagementVendors?.map((v) => v.id));
+  check(
+    "couple's engagement_vendors list is scoped to their own engagement",
+    ownEngagementVendors?.every((v) => v.engagement_id === mariaJon.id) &&
+      ownIds.has(creditedVendor.id) &&
+      ownIds.has(uncreditedVendor.id) &&
+      !ownIds.has(otherEngagementVendor.id),
+  );
+
+  const { data: coupleInsert, error: coupleInsertError } = await asCouple2
+    .from("engagement_vendors")
+    .insert({
+      engagement_id: mariaJon.id,
+      business_name: "RLS Test Couple-Added Supplier",
+      category: "other",
+    })
+    .select("id")
+    .maybeSingle();
+  check(
+    "couple can add to their own engagement's vendor log",
+    !coupleInsertError && !!coupleInsert,
+  );
+  if (coupleInsert) {
+    await admin.from("engagement_vendors").delete().eq("id", coupleInsert.id);
+  }
+
+  const { error: crossInsertError } = await asCouple2.from("engagement_vendors").insert({
+    engagement_id: erickErika.id,
+    business_name: "should not be allowed",
+    category: "other",
+  });
+  check(
+    "couple cannot add to another engagement's vendor log",
+    crossInsertError !== null,
+  );
+
+  const { data: anonCredited } = await asAnon
+    .from("engagement_vendors")
+    .select("id")
+    .eq("id", creditedVendor.id)
+    .maybeSingle();
+  check(
+    "anon can read a credited engagement_vendors row",
+    anonCredited?.id === creditedVendor.id,
+  );
+
+  const { data: anonUncredited } = await asAnon
+    .from("engagement_vendors")
+    .select("id")
+    .eq("id", uncreditedVendor.id)
+    .maybeSingle();
+  check("anon cannot read an uncredited engagement_vendors row", anonUncredited === null);
+} finally {
+  await admin.from("engagement_vendors").delete().eq("id", creditedVendor.id);
+  await admin.from("engagement_vendors").delete().eq("id", uncreditedVendor.id);
+  await admin.from("engagement_vendors").delete().eq("id", otherEngagementVendor.id);
+  await admin.from("engagement_members").delete().eq("user_id", couple2UserId);
+  await admin.auth.admin.deleteUser(couple2UserId);
+  await admin.from("vendor_photos").delete().eq("id", approvedPhoto.id);
+  await admin.from("vendor_photos").delete().eq("id", pendingPhoto.id);
+  await admin.from("vendors").delete().eq("id", pendingVendor.id);
+  await admin.from("vendors").delete().eq("id", approvedVendor.id);
+}
+
 const secondAccountEmail = `rls-test-account-${Date.now()}@example.com`;
 const secondAccountPassword = "verify-rls-temp-password-1234";
 
