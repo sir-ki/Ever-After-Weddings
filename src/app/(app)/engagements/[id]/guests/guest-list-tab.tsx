@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { archiveGuest, unarchiveGuest } from "./actions";
+import CopyLinkButton from "./copy-link-button";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 const SIDE_LABELS: Record<string, string> = {
   bride: "Bride",
@@ -143,6 +146,12 @@ export default async function GuestListTab({
         </form>
 
         <div className="flex gap-2">
+          <a
+            href={`/engagements/${engagementId}/guests/invitations`}
+            className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+          >
+            Download all invitations
+          </a>
           <Link
             href={`/engagements/${engagementId}/guests/rotate-all`}
             className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
@@ -223,6 +232,13 @@ export default async function GuestListTab({
                           >
                             Day hub ↗
                           </Link>
+                          <a
+                            href={`/engagements/${engagementId}/guests/${guest.id}/invitation`}
+                            className="text-sm text-neutral-500 hover:text-neutral-900 hover:underline"
+                          >
+                            Download invitation
+                          </a>
+                          <CopyLinkButton url={`${SITE_URL}/r/${guest.invite_token}`} />
                           <Link
                             href={`/engagements/${engagementId}/guests/${guest.id}/edit`}
                             className="text-sm text-neutral-500 hover:text-neutral-900 hover:underline"

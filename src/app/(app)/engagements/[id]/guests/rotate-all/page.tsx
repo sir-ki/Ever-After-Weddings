@@ -32,9 +32,10 @@ export default async function RotateAllGuestTokensPage({
         intact, but every link stops working the moment this commits.
       </p>
       <p className="mb-6 text-sm font-medium text-neutral-700">
-        Anyone who hasn&apos;t opened their link yet will need the new one
-        sent to them. This is meant for &quot;we published the wrong link
-        publicly&quot; situations, not routine use.
+        This also invalidates every invitation card already downloaded or
+        printed for this engagement — anyone holding one will need a freshly
+        downloaded card or link. This is meant for &quot;we published the
+        wrong link publicly&quot; situations, not routine use.
       </p>
 
       <form action={rotateAllGuestTokens} className="flex gap-3">

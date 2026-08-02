@@ -35,8 +35,9 @@ export default async function RotateGuestTokenPage({
       </h1>
       <p className="mb-6 text-sm text-neutral-600">
         The current link (<code className="text-xs">/r/{guest.invite_token}</code>)
-        stops working immediately. If they&apos;ve already saved or printed it,
-        you&apos;ll need to send them the new one.
+        stops working immediately — including any invitation card you&apos;ve
+        already sent or printed for them. If they&apos;ve already got one,
+        you&apos;ll need to send them a newly downloaded card or link.
       </p>
 
       <form action={rotateGuestToken} className="flex gap-3">

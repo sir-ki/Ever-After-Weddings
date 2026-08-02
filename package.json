@@ -9,13 +9,16 @@
     "lint": "eslint",
     "seed": "node --env-file=.env.local scripts/seed.mjs",
     "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs",
-    "verify:guest-token": "node --env-file=.env.local scripts/verify-guest-token-security.mjs"
+    "verify:guest-token": "node --env-file=.env.local scripts/verify-guest-token-security.mjs",
+    "verify:invitation-card": "node --env-file=.env.local scripts/verify-invitation-card.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.111.0",
     "jsqr": "^1.4.0",
+    "jszip": "^3.10.1",
     "next": "16.2.12",
+    "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "server-only": "^0.0.1"
@@ -23,10 +26,13 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pngjs": "^6.0.5",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
+    "pngjs": "^7.0.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

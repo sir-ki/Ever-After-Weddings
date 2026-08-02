@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateGuest } from "../../actions";
+import CopyLinkButton from "../../copy-link-button";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export default async function EditGuestPage({
   params,
@@ -51,16 +54,36 @@ export default async function EditGuestPage({
         </p>
       )}
 
-      <div className="mb-6 flex items-center justify-between rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
-        <span className="truncate text-neutral-600">
-          /r/{guest.invite_token}
-        </span>
-        <Link
-          href={`/engagements/${id}/guests/${guestId}/rotate`}
-          className="ml-3 shrink-0 text-neutral-500 hover:text-neutral-900 hover:underline"
-        >
-          Regenerate link
-        </Link>
+      <div className="mb-6 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+        <div className="flex items-center justify-between text-sm">
+          <span className="truncate text-neutral-600">
+            /r/{guest.invite_token}
+          </span>
+          <div className="ml-3 flex shrink-0 items-center gap-3">
+            <CopyLinkButton url={`${SITE_URL}/r/${guest.invite_token}`} />
+            <Link
+              href={`/engagements/${id}/guests/${guestId}/rotate`}
+              className="text-neutral-500 hover:text-neutral-900 hover:underline"
+            >
+              Regenerate link
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-end gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/engagements/${id}/guests/${guestId}/invitation`}
+            alt="Invitation card preview"
+            className="h-40 w-32 rounded-md border border-neutral-200 object-cover"
+          />
+          <a
+            href={`/engagements/${id}/guests/${guestId}/invitation`}
+            className="text-sm text-neutral-500 hover:text-neutral-900 hover:underline"
+          >
+            Download invitation
+          </a>
+        </div>
       </div>
 
       <form action={updateGuest} className="space-y-4">
