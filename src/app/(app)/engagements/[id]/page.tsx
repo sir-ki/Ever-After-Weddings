@@ -50,7 +50,7 @@ export default async function EngagementWorkspacePage({
 }) {
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
-  const { tab = "overview" } = resolvedSearchParams;
+  const { tab = "overview", error } = resolvedSearchParams;
   const supabase = await createClient();
 
   const { data: engagement } = await supabase
@@ -156,7 +156,7 @@ export default async function EngagementWorkspacePage({
       ) : activeTab.key === "checkpoints" ? (
         <CheckpointsTab engagementId={id} />
       ) : activeTab.key === "vendors" ? (
-        <VendorsTab engagementId={id} />
+        <VendorsTab engagementId={id} error={error} />
       ) : null}
     </div>
   );

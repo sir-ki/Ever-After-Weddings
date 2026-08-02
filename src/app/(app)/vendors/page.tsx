@@ -155,7 +155,12 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
   );
 }
 
-export default async function VendorReviewPage() {
+export default async function VendorReviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error: errorMessage } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -189,6 +194,12 @@ export default async function VendorReviewPage() {
   return (
     <div className="max-w-3xl">
       <h1 className="mb-6 text-xl font-semibold text-neutral-900">Vendor review</h1>
+
+      {errorMessage && (
+        <p className="mb-6 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          {errorMessage}
+        </p>
+      )}
 
       <h2 className="mb-3 text-sm font-medium uppercase text-neutral-500">
         Pending ({pending.length})

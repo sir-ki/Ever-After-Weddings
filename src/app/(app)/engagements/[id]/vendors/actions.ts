@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 export async function addEngagementVendor(formData: FormData) {
   const engagementId = formData.get("engagement_id") as string;
   const vendorId = (formData.get("vendor_id") as string) || null;
+  const notes = (formData.get("notes") as string) || null;
   const supabase = await createClient();
 
   if (vendorId) {
@@ -22,19 +24,28 @@ export async function addEngagementVendor(formData: FormData) {
       category: vendor?.category ?? "other",
       contact_phone: vendor?.contact_phone ?? null,
       contact_email: vendor?.contact_email ?? null,
+      notes,
     });
   } else {
+    const businessName = (formData.get("business_name") as string)?.trim();
+    if (!businessName) {
+      redirect(
+        `/engagements/${engagementId}?tab=vendors&error=${encodeURIComponent("Business name is required for an off-platform supplier.")}`,
+      );
+    }
+
     await supabase.from("engagement_vendors").insert({
       engagement_id: engagementId,
-      business_name: formData.get("business_name") as string,
+      business_name: businessName,
       category: formData.get("category") as string,
       contact_phone: (formData.get("contact_phone") as string) || null,
       contact_email: (formData.get("contact_email") as string) || null,
-      notes: (formData.get("notes") as string) || null,
+      notes,
     });
   }
 
   revalidatePath(`/engagements/${engagementId}`);
+  redirect(`/engagements/${engagementId}?tab=vendors`);
 }
 
 export async function toggleEngagementVendorCredit(formData: FormData) {

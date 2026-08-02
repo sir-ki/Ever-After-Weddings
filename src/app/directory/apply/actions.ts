@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { InvalidRateError, parseOptionalRate } from "@/lib/parse-rate";
 
 const CATEGORIES = ["photo", "venue", "catering", "florals", "hmua", "cake", "music", "other"];
 
@@ -29,8 +30,17 @@ export async function submitVendorApplication(formData: FormData) {
     .filter(Boolean)
     .slice(0, 12);
 
-  const rateFromRaw = formData.get("rate_from") as string;
-  const rateToRaw = formData.get("rate_to") as string;
+  let rateFrom: number | null;
+  let rateTo: number | null;
+  try {
+    rateFrom = parseOptionalRate(formData.get("rate_from"), "Rate from");
+    rateTo = parseOptionalRate(formData.get("rate_to"), "Rate to");
+  } catch (e) {
+    if (e instanceof InvalidRateError) {
+      redirect(`/directory/apply?error=${encodeURIComponent(e.message)}`);
+    }
+    throw e;
+  }
 
   const admin = createAdminClient();
 
@@ -40,8 +50,8 @@ export async function submitVendorApplication(formData: FormData) {
       business_name,
       category,
       description: (formData.get("description") as string) || null,
-      rate_from: rateFromRaw ? Number(rateFromRaw) : null,
-      rate_to: rateToRaw ? Number(rateToRaw) : null,
+      rate_from: rateFrom,
+      rate_to: rateTo,
       rate_note: (formData.get("rate_note") as string) || null,
       contact_phone: (formData.get("contact_phone") as string) || null,
       contact_email: (formData.get("contact_email") as string) || null,

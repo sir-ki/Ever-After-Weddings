@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { InvalidRateError, parseOptionalRate } from "@/lib/parse-rate";
 
 async function requireAccount() {
   const supabase = await createClient();
@@ -81,8 +82,17 @@ export async function updateVendor(formData: FormData) {
   const wasApproved = formData.get("was_approved") === "on";
   const { supabase } = await requireAccount();
 
-  const rateFromRaw = formData.get("rate_from") as string;
-  const rateToRaw = formData.get("rate_to") as string;
+  let rateFrom: number | null;
+  let rateTo: number | null;
+  try {
+    rateFrom = parseOptionalRate(formData.get("rate_from"), "Rate from");
+    rateTo = parseOptionalRate(formData.get("rate_to"), "Rate to");
+  } catch (e) {
+    if (e instanceof InvalidRateError) {
+      redirect(`/vendors?error=${encodeURIComponent(e.message)}`);
+    }
+    throw e;
+  }
 
   await supabase
     .from("vendors")
@@ -90,8 +100,8 @@ export async function updateVendor(formData: FormData) {
       business_name: formData.get("business_name") as string,
       category: formData.get("category") as string,
       description: (formData.get("description") as string) || null,
-      rate_from: rateFromRaw ? Number(rateFromRaw) : null,
-      rate_to: rateToRaw ? Number(rateToRaw) : null,
+      rate_from: rateFrom,
+      rate_to: rateTo,
       rate_note: (formData.get("rate_note") as string) || null,
       contact_phone: (formData.get("contact_phone") as string) || null,
       contact_email: (formData.get("contact_email") as string) || null,
@@ -100,4 +110,5 @@ export async function updateVendor(formData: FormData) {
     .eq("id", vendorId);
 
   revalidatePath("/vendors");
+  redirect("/vendors");
 }

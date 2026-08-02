@@ -7,7 +7,13 @@ import {
 
 const CATEGORIES = ["photo", "venue", "catering", "florals", "hmua", "cake", "music", "other"];
 
-export default async function VendorsTab({ engagementId }: { engagementId: string }) {
+export default async function VendorsTab({
+  engagementId,
+  error,
+}: {
+  engagementId: string;
+  error?: string;
+}) {
   const supabase = await createClient();
 
   const [{ data: booked }, { data: directory }] = await Promise.all([
@@ -33,6 +39,11 @@ export default async function VendorsTab({ engagementId }: { engagementId: strin
     <div>
       <div className="mb-6 rounded-lg border border-neutral-200 bg-white p-4">
         <h3 className="mb-3 font-medium text-neutral-900">Add a supplier</h3>
+        {error && (
+          <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
         <form action={addEngagementVendor} className="space-y-3">
           <input type="hidden" name="engagement_id" value={engagementId} />
           <div>

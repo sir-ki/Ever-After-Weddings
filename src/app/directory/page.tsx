@@ -73,7 +73,7 @@ export default async function DirectoryPage({
       </form>
 
       {vendors?.length ? (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {vendors.map((vendor) => {
             const photos = (vendor.vendor_photos ?? []).slice().sort(
               (a, b) => a.sort_order - b.sort_order,
