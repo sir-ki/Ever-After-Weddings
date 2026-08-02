@@ -21,12 +21,13 @@ four of M8's deferred minor findings. See §6 and §7 for detail. §10 covers
 the workflow this pass used, since it's a deliberate change from how
 M0–M8 were built.
 
-**2026-08-02, launch readiness (post-hardening): Parts 1, 2, 3, and 5 of
-`docs/ever-after-launch-readiness-spec.md` are done, verified, and
-pushed.** Parts 4 (guest-facing UI/UX pass), 6 (entourage & processional),
-and 7 (printables & exports) are still open. §11 is the full writeup —
-read it before touching the invite flow, guest tokens, or invitation
-cards, and before picking the next part.
+**2026-08-03, launch readiness continued: Part 6 (entourage & processional)
+is done, verified live, and merged.** Parts 1, 2, 3, and 5 were already
+done as of 2026-08-02. Parts 4 (guest-facing UI/UX pass) and 7 (printables
+& exports) are still open — the spec's own suggested order puts the UI/UX
+pass *last*, specifically so it styles the new entourage site section in
+the same sweep rather than redoing it. §11 is the full writeup for Parts
+1/2/3/5; §12 covers Part 6.
 
 ---
 
@@ -87,6 +88,7 @@ Supabase project in order:
 10. `0010_users_self_update.sql` — self-service profile editing: `users_update_self` RLS policy plus `lock_self_update_sensitive_columns` trigger to keep `global_role`/`email`/`archived_at` Account-only — see §5.
 11. `0011_fix_users_self_update_trigger.sql` — fixes `0010`'s trigger, which also blocked legitimate service-role writes — see the bug writeup in §6.
 12. `0012_member_invites.sql` — `engagement_invites` (launch-readiness Part 1): single-use, expiring invite tokens; RLS is Account read/write, engagement-members read-only. Corrected in place after initial verification found the token's original base64 encoding could contain `/`, breaking the `/invite/[token]` route — now base64url, matching `guests.invite_token`'s existing scheme. See §11.
+13. `0013_entourage_processional.sql` — `guests.entourage_role`/`entourage_sort` (launch-readiness Part 6): free text against a suggested list, no check constraint, since entourage roles vary by wedding. New `processional_entries` table (single `for all` RLS policy, same shape as `tables_all`/`schedule_items_all`). Extends `site_sections.section_type` to add `entourage` and `footer` — the latter folded in per the spec's own instruction, closing a known gap left open since M5. See §12.
 
 **Not yet in the schema**: `media` (post-v1, deferred — see the data model doc).
 
@@ -270,7 +272,8 @@ still has gaps."
   public-read carve-outs (anon can read an approved vendor but not a
   pending one, a credited `engagement_vendors` row but not an uncredited
   one) and the "no distinguishing oracle" property for revoked/expired
-  invites. **39 checks total.**
+  invites, and, as of 2026-08-03, `processional_entries` (Part 6). **44
+  checks total.**
 - `scripts/verify-guest-token-security.mjs` — hits the guest API directly
   over HTTP (not through the UI), confirms guest A's token reveals nothing
   about guest B, no endpoint returns a list, tampered/garbage tokens 404
@@ -395,15 +398,11 @@ design/plan pass before implementation, not a quick patch.
 - **Guest-facing UI/UX pass (launch-readiness Part 4)** — not started.
   Deliberately last in the launch-readiness order, so every surface built
   by Parts 1–3/5/6 gets styled in one sweep instead of piecemeal.
-- **Entourage & processional (launch-readiness Part 5, doc's own Part 6)** —
-  not started. The most visible Filipino-wedding gap per the launch
-  spec; can run independently of the other parts.
 - **Printables & exports (launch-readiness Part 7)** — not started.
-  Sequenced after entourage (so the processional printable exists) and
-  after invitation cards (Part 3, done) since it reuses that rendering
-  pipeline.
+  Sequenced after entourage (now done, so the processional printable can
+  be included) and after invitation cards (Part 3, done) since it reuses
+  that rendering pipeline.
 - **Coordinator "who to ask" block** on the day-of hub only renders if an `engagement_members` row with `role = 'coordinator'` exists *and* that user's `users.phone` is filled in. `/profile` (added 2026-08-02) lets any signed-in user set their own phone, and the member-invite flow (§11) now provides a real way to attach a coordinator — this block should light up for any engagement with an invited, phone-having coordinator; still dark for the two original seed engagements since their members were only ever added via SQL.
-- **Footer site section** — `docs/ever-after-template-spec.md` describes one; the data model's `site_sections.section_type` check constraint doesn't include `footer`. Skipped rather than guessed at; flagged in the M5 commit. The launch-readiness spec's entourage part (Part 6) folds adding `footer` into the same migration as `entourage`, so this closes naturally whenever that part gets built.
 - **No vendor self-service login or editor** — deliberate M8 scope decision, see §5. Adding it later is additive (the schema already has `vendors.owner_user_id`), not a rework.
 - ~~A handful of Minor-severity findings from M8's task reviews were deliberately deferred~~ — **fixed 2026-08-02**: non-numeric `rate_from`/`rate_to` now redirects with an error instead of silently becoming `null` (`src/lib/parse-rate.ts`, used by both `directory/apply/actions.ts` and `(app)/vendors/actions.ts`); the per-event vendor log's off-platform `business_name` is now required server-side (`(app)/engagements/[id]/vendors/actions.ts`); notes on a directory-linked vendor-log entry are no longer discarded (both insert branches now pass `notes` through); `/directory`'s card grid is now `grid-cols-1 sm:grid-cols-2`. Fixing the required-field/rate validation surfaced a small pre-existing gap in the same code — action success paths only called `revalidatePath`, never `redirect`, so a prior error left in the URL's `?error=` param would stick around after a subsequent successful submit; both `addEngagementVendor` and `updateVendor` now redirect on success too.
 - **Physical print + camera scan test still owed** (Part 3's own done-when). QR decode correctness is proven by script (`verify-invitation-card.mjs`, using the scanner's actual `jsqr`/`extractToken()` logic), but no environment used for this project so far has had a printer or camera — a real print-and-scan against the live M7 scanner is still worth doing once someone has both.
@@ -632,4 +631,77 @@ always worked correctly. Not a product bug — every action fired correctly
 and produced the right server-side result once actually triggered — but
 worth trying that fallback immediately if a form seems to do nothing
 during a future live walkthrough, rather than assuming the feature is
-broken.
+broken. **One refinement found during Part 6's walkthrough:** don't grab
+`document.forms[0]` blindly — the header's "Sign out" button is its own
+form and is almost always first in DOM order, so a blind `forms[0]`
+submit signs the session out instead of submitting the intended form.
+Select the target form by a distinguishing attribute (a hidden input's
+`name`/`value`, or the submit button's own text) instead.
+
+---
+
+## 12. Launch-readiness spec — Part 6 (2026-08-03)
+
+Entourage & processional, per `docs/ever-after-launch-readiness-spec.md`
+Part 6 — the most visible Filipino-wedding gap the spec called out. Done,
+verified live against Maria & Jon's seeded guests, and merged. One
+commit on `main` (migration `0013_entourage_processional.sql` plus the
+app-layer changes below).
+
+**Roles are an attribute on `guests`, not a separate table.** Entourage
+members are guests like any other — they RSVP, get seated, get scanned —
+so `entourage_role`/`entourage_sort` are plain nullable columns, free text
+against a suggested list (`src/lib/entourage-roles.ts`) rather than a
+check constraint, since Filipino weddings vary and a constraint would
+force a migration every time a couple adds a role the list didn't
+anticipate. New **Entourage tab**
+(`src/app/(app)/engagements/[id]/entourage/`) has two views: roles
+(assign/remove, grouped by role with per-role counts) and processional
+(ordered pairs/singles/free-text entries, with move-up/move-down actions
+that swap adjacent `sort_order` values — this codebase had no
+drag-and-drop or reorder pattern anywhere before this, so it introduces
+the simplest version: a form-per-row swap, not a client-side library).
+
+**`processional_entries` is a new table**, RLS via the same single
+`for all` policy shape as `tables_all`/`schedule_items_all` — no
+asymmetric public-read path needed, because the names that surface on the
+public site come from `guests` directly, not from this table.
+
+**The public site's entourage section reads `guests` via the admin
+client**, same discipline as the public site page's existing engagement
+lookup (`src/app/s/[slug]/page.tsx`): `guests` has no public-read RLS
+carve-out, rightly so, since the same row holds phone, notes and
+`invite_token`. The site page's admin lookup is narrowed to exactly
+`full_name` + `entourage_role` for non-archived guests with a role set —
+nothing else off that row ever reaches an anonymous visitor.
+
+**`footer` was folded into this migration**, per the spec's own
+instruction — it needed the same `site_sections.section_type` check
+constraint change as `entourage`, and had been a known gap since M5 (the
+template spec describes a footer section; M5 never added it to the check
+constraint). Both are additive to `SiteRenderer`
+(`src/components/site-renderer.tsx`), the site editor's
+`defaultSections`/`buildSectionContent`/`SECTION_SORT_ORDER`
+(`src/app/(app)/engagements/[id]/site/actions.ts`), and its editor forms
+(`site-tab.tsx`) — same upsert-per-section-type pattern M8 already
+established, so sites created before this migration only gain an
+`entourage`/`footer` row the first time Account saves that section (same
+gap `suppliers` had pre-M8, same fix shape).
+
+**Day-of hub gets a "View processional ↗" link** next to "Add item" in
+the run-of-show header — a link only, no data coupling.
+`schedule_items` and `processional_entries` stay separate tables, per the
+spec's own scope boundary.
+
+**Verified live, not just built:** signed in as a disposable throwaway
+Account user (same pattern §8/§11 already establish — no saved password
+for the real Account login in this session), assigned Rico Santos
+(Maria & Jon) the `principal_sponsor` role via the Entourage tab, added
+two processional entries (one guest pair, one free-text "Church
+coordinator"), confirmed move-up actually reordered them, then confirmed
+the entourage section and footer both render correctly on the live public
+site (`/s/mariaandjon`) once each section was saved once. All test data
+and the throwaway Account user were cleaned up afterward — nothing
+persists in Maria & Jon's engagement from this pass.
+`npm run verify:rls` extended with 5 new checks for `processional_entries`
+isolation (44 total, all passing) and `npm run build` passes clean.

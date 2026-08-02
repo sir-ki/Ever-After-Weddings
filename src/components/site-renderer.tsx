@@ -1,3 +1,5 @@
+import { ENTOURAGE_ROLES, entourageRoleLabel } from "@/lib/entourage-roles";
+
 // Renders a couple's site from its site_sections rows. Shared by the
 // public route (/s/[slug]) and the couple's read-only preview in the
 // workspace, so both surfaces always show exactly the same page.
@@ -42,6 +44,9 @@ export type SupplierCredit = {
   contact_phone: string | null;
   contact_email: string | null;
 };
+export type EntourageContent = { heading?: string; intro?: string };
+export type EntourageMember = { full_name: string; entourage_role: string };
+export type FooterContent = { message?: string };
 
 export type SiteSectionRow = {
   section_type: string;
@@ -72,11 +77,13 @@ export default function SiteRenderer({
   fallbackHeadline,
   weddingDate,
   suppliers,
+  entourage,
 }: {
   sections: SiteSectionRow[];
   fallbackHeadline: string;
   weddingDate: string | null;
   suppliers: SupplierCredit[];
+  entourage: EntourageMember[];
 }) {
   const byType = new Map(sections.map((s) => [s.section_type, s]));
 
@@ -117,6 +124,28 @@ export default function SiteRenderer({
   const suppliersSection = byType.get("suppliers");
   const suppliersContent = (suppliersSection?.content ?? {}) as SuppliersContent;
   const showSuppliers = suppliersSection?.is_visible && suppliers.length > 0;
+
+  const entourageSection = byType.get("entourage");
+  const entourageContent = (entourageSection?.content ?? {}) as EntourageContent;
+  const showEntourage = entourageSection?.is_visible && entourage.length > 0;
+  const entourageByRole = new Map<string, string[]>();
+  for (const member of entourage) {
+    const list = entourageByRole.get(member.entourage_role) ?? [];
+    list.push(member.full_name);
+    entourageByRole.set(member.entourage_role, list);
+  }
+  const entourageRolesInUse = Array.from(entourageByRole.keys()).sort((a, b) => {
+    const ai = ENTOURAGE_ROLES.findIndex((r) => r.value === a);
+    const bi = ENTOURAGE_ROLES.findIndex((r) => r.value === b);
+    if (ai !== -1 && bi !== -1) return ai - bi;
+    if (ai !== -1) return -1;
+    if (bi !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  const footerSection = byType.get("footer");
+  const footerContent = (footerSection?.content ?? {}) as FooterContent;
+  const showFooter = footerSection?.is_visible && !!footerContent.message;
 
   const days = heroContent.show_countdown ? daysUntil(weddingDate) : null;
 
@@ -256,6 +285,35 @@ export default function SiteRenderer({
             ))}
           </ul>
         </section>
+      )}
+
+      {showEntourage && (
+        <section className="mx-auto max-w-3xl px-6 py-16">
+          <h2 className="mb-4 text-2xl font-semibold text-neutral-900">
+            {entourageContent.heading || "Our entourage"}
+          </h2>
+          {entourageContent.intro && (
+            <p className="mb-6 text-neutral-700">{entourageContent.intro}</p>
+          )}
+          <div className="grid gap-6 sm:grid-cols-2">
+            {entourageRolesInUse.map((role) => (
+              <div key={role}>
+                <p className="font-medium text-neutral-900">{entourageRoleLabel(role)}</p>
+                <ul className="mt-1 space-y-0.5 text-neutral-700">
+                  {entourageByRole.get(role)!.map((name) => (
+                    <li key={name}>{name}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {showFooter && (
+        <footer className="border-t border-neutral-200 bg-white px-6 py-10 text-center text-sm text-neutral-500">
+          {footerContent.message}
+        </footer>
       )}
     </div>
   );

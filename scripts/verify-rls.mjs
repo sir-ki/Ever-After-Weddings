@@ -907,6 +907,116 @@ await admin
   .eq("email", "rls-test-invite-expired@example.com");
 await admin.auth.admin.deleteUser(inviterUserId);
 
+// Entourage & processional (launch-readiness spec Part 6):
+// processional_entries isolation. Same single for-all policy shape as
+// tables_all/schedule_items_all — Account or the owning engagement's
+// members, nobody else. No asymmetric public-read path (unlike
+// site_sections): the entourage names on the public site come from
+// `guests` directly via the admin client, not from this table.
+const { data: mariaJonEntry } = await admin
+  .from("processional_entries")
+  .insert({ engagement_id: mariaJon.id, label: "RLS Test Entry (M&J)" })
+  .select("id")
+  .single();
+const { data: erickErikaEntry } = await admin
+  .from("processional_entries")
+  .insert({ engagement_id: erickErika.id, label: "RLS Test Entry (E&E)" })
+  .select("id")
+  .single();
+
+const couple5Email = `rls-test-couple5-${Date.now()}@example.com`;
+const couple5Password = "verify-rls-temp-password-1234";
+const { data: created5, error: create5Error } = await admin.auth.admin.createUser({
+  email: couple5Email,
+  password: couple5Password,
+  email_confirm: true,
+  user_metadata: { full_name: "RLS Test Couple 5" },
+});
+if (create5Error) {
+  console.error("Failed to create fifth test couple:", create5Error.message);
+  process.exit(1);
+}
+const couple5UserId = created5.user.id;
+await admin.from("engagement_members").insert({
+  engagement_id: mariaJon.id,
+  user_id: couple5UserId,
+  role: "partner",
+});
+
+try {
+  const asCouple5 = createClient(url, anonKey);
+  const { error: signIn5Error } = await asCouple5.auth.signInWithPassword({
+    email: couple5Email,
+    password: couple5Password,
+  });
+  if (signIn5Error) {
+    console.error("Failed to sign in as fifth test couple:", signIn5Error.message);
+    process.exit(1);
+  }
+
+  const { data: visibleEntries } = await asCouple5
+    .from("processional_entries")
+    .select("id, engagement_id");
+  const visibleEntryIds = new Set(visibleEntries?.map((e) => e.id));
+  check(
+    "couple's processional list is scoped to their own engagement",
+    visibleEntries?.every((e) => e.engagement_id === mariaJon.id) &&
+      visibleEntryIds.has(mariaJonEntry.id) &&
+      !visibleEntryIds.has(erickErikaEntry.id),
+  );
+
+  const { data: otherEntryFetch } = await asCouple5
+    .from("processional_entries")
+    .select("id")
+    .eq("id", erickErikaEntry.id)
+    .maybeSingle();
+  check(
+    "couple cannot fetch the other engagement's processional entry by id",
+    otherEntryFetch === null,
+  );
+
+  const { data: ownEntryInsert, error: ownEntryInsertError } = await asCouple5
+    .from("processional_entries")
+    .insert({ engagement_id: mariaJon.id, label: "Couple-Added Entry" })
+    .select("id")
+    .maybeSingle();
+  check(
+    "couple can add a processional entry to their own engagement",
+    !ownEntryInsertError && !!ownEntryInsert,
+  );
+  if (ownEntryInsert) {
+    await admin.from("processional_entries").delete().eq("id", ownEntryInsert.id);
+  }
+
+  const { error: crossEntryInsertError } = await asCouple5.from("processional_entries").insert({
+    engagement_id: erickErika.id,
+    label: "should not be allowed",
+  });
+  check(
+    "couple cannot add a processional entry to another engagement",
+    crossEntryInsertError !== null,
+  );
+
+  const { error: crossEntryUpdateError } = await asCouple5
+    .from("processional_entries")
+    .update({ label: "should not be allowed" })
+    .eq("id", erickErikaEntry.id);
+  const { data: erickErikaEntryAfter } = await admin
+    .from("processional_entries")
+    .select("label")
+    .eq("id", erickErikaEntry.id)
+    .single();
+  check(
+    "couple cannot update another engagement's processional entry",
+    erickErikaEntryAfter.label === "RLS Test Entry (E&E)" || crossEntryUpdateError !== null,
+  );
+} finally {
+  await admin.from("processional_entries").delete().eq("id", mariaJonEntry.id);
+  await admin.from("processional_entries").delete().eq("id", erickErikaEntry.id);
+  await admin.from("engagement_members").delete().eq("user_id", couple5UserId);
+  await admin.auth.admin.deleteUser(couple5UserId);
+}
+
 const secondAccountEmail = `rls-test-account-${Date.now()}@example.com`;
 const secondAccountPassword = "verify-rls-temp-password-1234";
 

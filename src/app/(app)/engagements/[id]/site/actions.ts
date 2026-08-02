@@ -111,6 +111,16 @@ export async function createSite(formData: FormData) {
       sort_order: 6,
       content: { heading: "Suppliers" },
     },
+    {
+      section_type: "entourage",
+      sort_order: 7,
+      content: { heading: "Our entourage", intro: "" },
+    },
+    {
+      section_type: "footer",
+      sort_order: 8,
+      content: { message: "" },
+    },
   ];
 
   await supabase
@@ -185,6 +195,13 @@ function buildSectionContent(sectionType: string, formData: FormData): any {
     }
     case "suppliers":
       return { heading: (formData.get("heading") as string) || "Suppliers" };
+    case "entourage":
+      return {
+        heading: (formData.get("heading") as string) || "Our entourage",
+        intro: (formData.get("intro") as string) || "",
+      };
+    case "footer":
+      return { message: (formData.get("message") as string) || "" };
     default:
       return {};
   }
@@ -198,6 +215,8 @@ const SECTION_SORT_ORDER: Record<string, number> = {
   gallery: 4,
   details: 5,
   suppliers: 6,
+  entourage: 7,
+  footer: 8,
 };
 
 export async function updateSiteSection(formData: FormData) {

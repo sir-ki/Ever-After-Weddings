@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { archiveGuest, unarchiveGuest } from "./actions";
 import CopyLinkButton from "./copy-link-button";
+import { entourageRoleLabel } from "@/lib/entourage-roles";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -60,7 +61,7 @@ export default async function GuestListTab({
   let query = supabase
     .from("guests")
     .select(
-      "id, full_name, side, guest_group, contact_phone, rsvp_status, archived_at, invite_token",
+      "id, full_name, side, guest_group, contact_phone, rsvp_status, archived_at, invite_token, entourage_role",
       { count: "exact" },
     )
     .eq("engagement_id", engagementId)
@@ -219,6 +220,7 @@ export default async function GuestListTab({
               <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Side</th>
               <th className="px-4 py-3 font-medium">Group</th>
+              <th className="px-4 py-3 font-medium">Entourage</th>
               <th className="px-4 py-3 font-medium">Contact</th>
               <th className="px-4 py-3 font-medium">RSVP</th>
               <th className="px-4 py-3 font-medium"></th>
@@ -236,6 +238,15 @@ export default async function GuestListTab({
                   </td>
                   <td className="px-4 py-3 text-neutral-600">
                     {guest.guest_group || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-neutral-600">
+                    {guest.entourage_role ? (
+                      <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-700">
+                        {entourageRoleLabel(guest.entourage_role)}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
                   </td>
                   <td className="px-4 py-3 text-neutral-600">
                     {guest.contact_phone || "—"}
@@ -321,7 +332,7 @@ export default async function GuestListTab({
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-neutral-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-neutral-500">
                   {showArchived ? "No archived guests." : "No guests found."}
                 </td>
               </tr>

@@ -62,6 +62,18 @@ export default async function PublicSitePage({
     .eq("engagement_id", site.engagement_id)
     .eq("credit_on_site", true);
 
+  // guests has no public-read RLS carve-out, rightly so — phone, notes and
+  // invite_token live on the same row. Same narrow admin-client lookup as
+  // the engagement fields above: the site row already proved this request
+  // is allowed, so this pulls only the two public-safe columns needed for
+  // the entourage section, nothing else off the guest row.
+  const { data: entourage } = await createAdminClient()
+    .from("guests")
+    .select("full_name, entourage_role")
+    .eq("engagement_id", site.engagement_id)
+    .is("archived_at", null)
+    .not("entourage_role", "is", null);
+
   return (
     <>
       {site.status === "draft" && (
@@ -74,6 +86,7 @@ export default async function PublicSitePage({
         fallbackHeadline={engagement.display_name}
         weddingDate={engagement.wedding_date}
         suppliers={suppliers ?? []}
+        entourage={entourage ?? []}
       />
     </>
   );

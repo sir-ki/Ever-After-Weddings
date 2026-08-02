@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { updateGuest } from "../../actions";
 import CopyLinkButton from "../../copy-link-button";
+import { ENTOURAGE_ROLES } from "@/lib/entourage-roles";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -20,7 +21,7 @@ export default async function EditGuestPage({
   const { data: guest } = await supabase
     .from("guests")
     .select(
-      "id, full_name, side, guest_group, contact_phone, guest_notes, rsvp_status, table_id, invite_token",
+      "id, full_name, side, guest_group, contact_phone, guest_notes, rsvp_status, table_id, invite_token, entourage_role",
     )
     .eq("id", guestId)
     .eq("engagement_id", id)
@@ -199,6 +200,31 @@ export default async function EditGuestPage({
               </option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label
+            htmlFor="entourage_role"
+            className="mb-1 block text-sm font-medium text-neutral-700"
+          >
+            Entourage role
+          </label>
+          <input
+            id="entourage_role"
+            name="entourage_role"
+            type="text"
+            list="entourage-role-options"
+            defaultValue={guest.entourage_role ?? ""}
+            placeholder="e.g. principal_sponsor, or type your own"
+            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+          />
+          <datalist id="entourage-role-options">
+            {ENTOURAGE_ROLES.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </datalist>
         </div>
 
         <div>

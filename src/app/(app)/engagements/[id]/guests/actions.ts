@@ -20,6 +20,7 @@ function guestFields(formData: FormData) {
     guest_group: (formData.get("guest_group") as string) || null,
     contact_phone: (formData.get("contact_phone") as string) || null,
     guest_notes: (formData.get("guest_notes") as string) || null,
+    entourage_role: (formData.get("entourage_role") as string) || null,
   };
 }
 

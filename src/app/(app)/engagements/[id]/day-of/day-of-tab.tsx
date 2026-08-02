@@ -129,12 +129,20 @@ export default async function DayOfTab({ engagementId }: { engagementId: string 
       <div className="rounded-lg border border-neutral-200 bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="font-medium text-neutral-900">Run of show</h3>
-          <Link
-            href={`/engagements/${engagementId}/day-of/new`}
-            className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
-          >
-            Add item
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/engagements/${engagementId}?tab=entourage`}
+              className="text-sm text-neutral-500 hover:text-neutral-900 hover:underline"
+            >
+              View processional ↗
+            </Link>
+            <Link
+              href={`/engagements/${engagementId}/day-of/new`}
+              className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+            >
+              Add item
+            </Link>
+          </div>
         </div>
         {items?.length ? (
           <table className="w-full text-left text-sm">
