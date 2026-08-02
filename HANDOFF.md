@@ -1,12 +1,119 @@
 # Ever After — Handoff
 
-Status snapshot as of Milestone 7. Written for whoever picks this up next —
-a contractor scoping M8, a future session of this same project, or the
+Status snapshot as of Milestone 7, **plus Milestone 8 in progress, paused
+mid-session — read §0 first.** Written for whoever picks this up next — a
+contractor resuming M8, a future session of this same project, or the
 founder coming back after a break.
 
 Companion to `docs/ever-after-build-plan.md`, which this follows milestone by
 milestone. Read that first for *why* the work is sequenced this way; this
 doc is *where things currently stand*.
+
+---
+
+## 0. Milestone 8 status — IN PROGRESS, paused mid-session
+
+**This file is inside a git worktree, not the main checkout.** Location:
+`.claude/worktrees/vendor-directory` off the main repo, branch
+`worktree-vendor-directory`, 9 commits ahead of local `main`. **Nothing
+here is pushed to origin or merged** — `main` on GitHub still shows M7 as
+the latest milestone. If you're a future session picking this up, either
+resume in this same worktree or re-derive it: the branch and its commits
+only exist locally right now.
+
+**Why a worktree at all:** the user chose isolation for this milestone
+specifically (asked explicitly when M7 and both security fixes had gone
+straight to `main`) — see the plan doc's own note on this decision.
+
+**Process being followed:** `superpowers:brainstorming` →
+`superpowers:writing-plans` → `superpowers:subagent-driven-development`
+(fresh implementer subagent per task, independent task-reviewer subagent
+per task, fix-loop on Important/Critical findings). Two artifacts this
+process produced, both committed to this branch:
+- Design spec: `docs/superpowers/specs/2026-08-02-vendor-directory-design.md`
+- Implementation plan (9 tasks, full code for each): `docs/superpowers/plans/2026-08-02-vendor-directory.md`
+
+**Progress ledger** (task-by-task history: fix rounds, findings, review
+verdicts, commit ranges): `.superpowers/sdd/2026-08-02-vendor-directory/progress.md`.
+**This file is gitignored — worktree-local only.** It will not survive if
+this worktree is deleted (`git worktree remove` / `ExitWorktree` with
+`action: "remove"`). If you need its history preserved, copy it out or
+paste it into a commit message before removing the worktree.
+
+**⚠️ Mid-session environment change:** the `superpowers` Claude Code plugin
+was uninstalled partway through this work (its skills and helper scripts —
+`scripts/task-brief`, `scripts/review-package`, `scripts/sdd-workspace` —
+disappeared from `~/.claude/plugins/cache/claude-plugins-official/`). The
+plan, spec, and ledger files were unaffected (they're normal repo files,
+not plugin state) and Tasks 1–7 plus an out-of-band regression fix had
+already gone through the full dispatch-implement-review-fix-loop process
+before this happened. After the plugin vanished, the same review discipline
+continued manually — diffs generated with plain `git log`/`git diff -U10`
+redirected to a file instead of the plugin's `review-package` script,
+review subagents dispatched with the same rigor via hand-written prompts.
+If the plugin is still missing when you resume, do the same: you don't
+need it to finish this, just replicate what it automated.
+
+### Task status (plan has 9 tasks total)
+
+| # | Task | Status |
+|---|---|---|
+| 1 | Migration `0009_vendor_directory.sql` (`vendors`, `vendor_photos`, `engagement_vendors` + RLS) | ✅ Done, reviewed clean. **Already applied to the live Supabase project** (`soagkxplguuuowgnnnsq`) — the same shared database `main` uses. The schema exists in production right now even though the code isn't merged. |
+| 2 | Extend `scripts/verify-rls.mjs` with vendor isolation checks | ✅ Done, reviewed clean (22/22 checks pass) |
+| 3 | Vendor signup (`/directory/apply`) | ✅ Done, 1 fix round (report accuracy only, code was already correct), reviewed clean |
+| 4 | Public vendor directory (`/directory`) | ✅ Done, reviewed clean |
+| 5 | Account approval queue (`/vendors`) | ✅ Done, 1 fix round (report accuracy only, code was already correct), reviewed clean |
+| 6 | Header nav link (Account-only "Vendors" link) | ✅ Done, reviewed clean |
+| 7 | Per-event vendor log tab | ✅ Done, reviewed clean |
+| — | *(out-of-band)* Fix dead fallback branch in `engagements/[id]/page.tsx` | ✅ Done, reviewed clean. Task 7 made the tab-switch ternary exhaustive (all 7 `TABS` entries now have explicit branches), which made the old "lands in Milestone N" placeholder branch unreachable — TypeScript correctly flagged it as `never`. Caught by Task 8's implementer, fixed as its own isolated commit, independently reviewed. Commits `ace28e7..5ccf2c9`. |
+| 8 | Suppliers site section (editor + renderer) — the most cross-cutting task: modifies the shared `SiteRenderer` component (used by both `/s/[slug]` and the site-tab preview) and changes `updateSiteSection` from `.update()` to `.upsert()` | **Implemented** (commit `ace28e7`), lint/build clean, implementer's own browser walkthrough reported passing. **Review was in progress and got interrupted before a verdict landed** — a review-package diff was generated (`.superpowers/sdd/2026-08-02-vendor-directory/review-f2e63c6..ace28e7.diff`) and a reviewer subagent was dispatched but the session was interrupted mid-call, so **no review verdict exists yet for this task's own diff**. This is the very next step. |
+| 9 | Final verification pass (full `lint`/`build`/`verify:rls`, cookie-free curl sweep of every new route, end-to-end manual walkthrough, update this handoff doc for the real M8 completion) | Not started |
+
+### Exact next step
+
+1. Dispatch (or redo) the Task 8 review. The diff file already exists at
+   `.superpowers/sdd/2026-08-02-vendor-directory/review-f2e63c6..ace28e7.diff`
+   (base `f2e63c6`, head `ace28e7` — **not** `5ccf2c9`, which is the
+   separate out-of-band fix reviewed independently). The implementer's
+   report is at `.superpowers/sdd/2026-08-02-vendor-directory/task-8-report.md`.
+   Task 8's full brief is at `.superpowers/sdd/2026-08-02-vendor-directory/task-8-brief.md`,
+   or read Task 8 directly from the plan doc.
+2. Specific things worth extra scrutiny in that review, per the plan's own
+   risk assessment: does `SECTION_SORT_ORDER` in `site/actions.ts` exactly
+   match what `createSite`'s `defaultSections` already assigns for the
+   pre-existing section types (a mismatch would silently reorder existing
+   sites' sections on next save)? Is the new `suppliers` prop passed by
+   *both* `SiteRenderer` callers? Does `/s/[slug]/page.tsx`'s new query use
+   the plain session client, not the admin client? The implementer's
+   dispatch ran without the safety classifier available (flagged by a
+   system note at the time) — treat that report's claims with extra
+   skepticism, same as this handoff's process notes above.
+3. Handle any fix-loop rounds the same way Tasks 3 and 5 needed (both had
+   Important findings about report accuracy, not actual code bugs — see the
+   ledger for exactly how those were resolved, as a template).
+4. Once Task 8 is clean, do Task 9 (final verification), including turning
+   this §0 back into a normal "✅ Done" row in the milestones table below
+   and rewriting this handoff the way M7's completion was written up in
+   §6/§7 below — this section (§0) should not exist in the final version.
+5. Only after Task 9 is clean and the user's reviewed it: merge this branch
+   into `main` (the user has not yet been asked how they want that done —
+   ask, don't assume `git merge` vs. a PR).
+
+### Dev server / environment state
+
+A `next dev` server was left running on `http://localhost:3000` from
+within this worktree (started via plain `npm run dev &`, not the
+`Claude_Browser` preview tooling). It may or may not still be running by
+the time you resume — check with `curl -s -o /dev/null -w "%{http_code}"
+http://localhost:3000/` before assuming either way, and restart with `npm
+run dev` from this worktree directory if needed. `.env.local` was manually
+copied into this worktree (it's gitignored, so a fresh worktree won't have
+it) — copy it again from the main checkout if you recreate the worktree.
+
+An authenticated Account browser session (`brulkeanjames@gmail.com`) was
+open in the `Claude_Browser` pane, tab "tab-1", pointed at this worktree's
+dev server — useful for picking up live verification without needing
+credentials again, if that session is still alive.
 
 ---
 
