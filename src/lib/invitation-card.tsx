@@ -1,42 +1,18 @@
 import "server-only";
-import { readFile } from "fs/promises";
-import path from "path";
 import QRCode from "qrcode";
 import { ImageResponse } from "next/og";
+import { COLORS, loadFonts, sanitizeFilenameSegment } from "./print-theme";
 
 // Ever After — Milestone/launch-readiness spec Part 3: the card is a
 // couple's first mailer, not a bare QR. One shared rendering path — the
 // per-guest download route and the bulk-zip route both call this same
 // function, per the spec's own note that later printables (Part 7) reuse
-// it too.
-//
-// Colors/type are the Part 4 spec's own default tokens, hardcoded for now
-// — sites.theme is still an untyped jsonb stub with no read/write anywhere
-// in this codebase, so there's no per-couple convention to hook into yet.
+// it too. Font loading and the color palette now live in
+// ./print-theme.ts, shared with Part 7's printables.
 const CARD_WIDTH = 1080;
 const CARD_HEIGHT = 1350;
 
-const COLORS = {
-  canvas: "#FDFAF7",
-  blush: "#F9EFEA",
-  border: "#E8DAD2",
-  ink: "#3D2E2B",
-  inkSecondary: "#6B5551",
-  accentInk: "#8E4A48",
-};
-
-let fontsPromise: Promise<{ serif: Buffer; sans: Buffer }> | null = null;
-
-function loadFonts() {
-  if (!fontsPromise) {
-    const fontsDir = path.join(process.cwd(), "src/assets/fonts");
-    fontsPromise = Promise.all([
-      readFile(path.join(fontsDir, "PTSerif-Regular.ttf")),
-      readFile(path.join(fontsDir, "PTSans-Regular.ttf")),
-    ]).then(([serif, sans]) => ({ serif, sans }));
-  }
-  return fontsPromise;
-}
+export { sanitizeFilenameSegment };
 
 function formatDate(date: string | null) {
   if (!date) return null;
@@ -46,12 +22,6 @@ function formatDate(date: string | null) {
     month: "long",
     day: "numeric",
   });
-}
-
-// Filenames use the guest's name, never their token — a folder of files
-// named after credentials is an avoidable leak, per the spec.
-export function sanitizeFilenameSegment(name: string): string {
-  return name.replace(/[\\/:*?"<>|]/g, "").trim() || "guest";
 }
 
 export type InvitationCardInput = {

@@ -13,6 +13,7 @@ import {
   renderInvitationCardPng,
   sanitizeFilenameSegment,
 } from "@/lib/invitation-card";
+import { contentDisposition } from "@/lib/print-theme";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -79,7 +80,7 @@ export async function GET(
   return new NextResponse(new Uint8Array(zipBuffer), {
     headers: {
       "Content-Type": "application/zip",
-      "Content-Disposition": `attachment; filename="${zipFilename}"`,
+      "Content-Disposition": contentDisposition(zipFilename),
     },
   });
 }

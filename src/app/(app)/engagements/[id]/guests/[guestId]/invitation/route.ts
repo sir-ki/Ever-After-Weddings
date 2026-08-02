@@ -6,6 +6,7 @@ import {
   renderInvitationCardPng,
   sanitizeFilenameSegment,
 } from "@/lib/invitation-card";
+import { contentDisposition } from "@/lib/print-theme";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -48,7 +49,7 @@ export async function GET(
   return new NextResponse(new Uint8Array(png), {
     headers: {
       "Content-Type": "image/png",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Disposition": contentDisposition(filename),
     },
   });
 }

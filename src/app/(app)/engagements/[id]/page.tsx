@@ -9,6 +9,7 @@ import CheckpointsTab from "./checkpoints/checkpoints-tab";
 import VendorsTab from "./vendors/vendors-tab";
 import PeopleTab from "./people/people-tab";
 import EntourageTab from "./entourage/entourage-tab";
+import PrintablesTab from "./printables/printables-tab";
 import { updateGuestCap } from "./actions";
 
 const TABS = [
@@ -21,6 +22,7 @@ const TABS = [
   { key: "vendors", label: "Vendors", milestone: 8 },
   { key: "people", label: "People" },
   { key: "entourage", label: "Entourage" },
+  { key: "printables", label: "Printables" },
 ] as const;
 
 const STAGE_LABELS: Record<string, string> = {
@@ -206,6 +208,8 @@ export default async function EngagementWorkspacePage({
         <PeopleTab engagementId={id} error={error} />
       ) : activeTab.key === "entourage" ? (
         <EntourageTab engagementId={id} />
+      ) : activeTab.key === "printables" ? (
+        <PrintablesTab engagementId={id} />
       ) : null}
     </div>
   );

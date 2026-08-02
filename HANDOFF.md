@@ -21,13 +21,13 @@ four of M8's deferred minor findings. See §6 and §7 for detail. §10 covers
 the workflow this pass used, since it's a deliberate change from how
 M0–M8 were built.
 
-**2026-08-03, launch readiness continued: Part 6 (entourage & processional)
-is done, verified live, and merged.** Parts 1, 2, 3, and 5 were already
-done as of 2026-08-02. Parts 4 (guest-facing UI/UX pass) and 7 (printables
-& exports) are still open — the spec's own suggested order puts the UI/UX
-pass *last*, specifically so it styles the new entourage site section in
-the same sweep rather than redoing it. §11 is the full writeup for Parts
-1/2/3/5; §12 covers Part 6.
+**2026-08-03, launch readiness: Parts 6 and 7 are both done, verified
+live, and merged**, alongside Parts 1, 2, 3, and 5 from 2026-08-02. Only
+Part 4 (guest-facing UI/UX pass) remains — deliberately last per the
+spec's own suggested order, so it styles every surface (including the
+new entourage site section and, in principle, any future printable UI)
+in one sweep rather than redoing it. §11 is the full writeup for Parts
+1/2/3/5; §12 covers Part 6; §13 covers Part 7.
 
 ---
 
@@ -396,12 +396,14 @@ flow and token rotation gaps listed here previously are **closed** — see
 design/plan pass before implementation, not a quick patch.
 
 - **Guest-facing UI/UX pass (launch-readiness Part 4)** — not started.
-  Deliberately last in the launch-readiness order, so every surface built
-  by Parts 1–3/5/6 gets styled in one sweep instead of piecemeal.
-- **Printables & exports (launch-readiness Part 7)** — not started.
-  Sequenced after entourage (now done, so the processional printable can
-  be included) and after invitation cards (Part 3, done) since it reuses
-  that rendering pipeline.
+  The only remaining launch-readiness part. Deliberately last in the
+  spec's own order, so every surface built by Parts 1–3/5/6/7 gets styled
+  in one sweep instead of piecemeal.
+- **Physical print check for Part 7's printables** — still owed, same
+  caveat Part 3 already recorded: no printer/camera has been available in
+  any environment used for this project so far. A4 sizing and PDF
+  structure are verified programmatically (§13); an actual print of the
+  attendee sheet and place cards is the one piece not yet done.
 - **Coordinator "who to ask" block** on the day-of hub only renders if an `engagement_members` row with `role = 'coordinator'` exists *and* that user's `users.phone` is filled in. `/profile` (added 2026-08-02) lets any signed-in user set their own phone, and the member-invite flow (§11) now provides a real way to attach a coordinator — this block should light up for any engagement with an invited, phone-having coordinator; still dark for the two original seed engagements since their members were only ever added via SQL.
 - **No vendor self-service login or editor** — deliberate M8 scope decision, see §5. Adding it later is additive (the schema already has `vendors.owner_user_id`), not a rework.
 - ~~A handful of Minor-severity findings from M8's task reviews were deliberately deferred~~ — **fixed 2026-08-02**: non-numeric `rate_from`/`rate_to` now redirects with an error instead of silently becoming `null` (`src/lib/parse-rate.ts`, used by both `directory/apply/actions.ts` and `(app)/vendors/actions.ts`); the per-event vendor log's off-platform `business_name` is now required server-side (`(app)/engagements/[id]/vendors/actions.ts`); notes on a directory-linked vendor-log entry are no longer discarded (both insert branches now pass `notes` through); `/directory`'s card grid is now `grid-cols-1 sm:grid-cols-2`. Fixing the required-field/rate validation surfaced a small pre-existing gap in the same code — action success paths only called `revalidatePath`, never `redirect`, so a prior error left in the URL's `?error=` param would stick around after a subsequent successful submit; both `addEngagementVendor` and `updateVendor` now redirect on success too.
@@ -705,3 +707,80 @@ and the throwaway Account user were cleaned up afterward — nothing
 persists in Maria & Jon's engagement from this pass.
 `npm run verify:rls` extended with 5 new checks for `processional_entries`
 isolation (44 total, all passing) and `npm run build` passes clean.
+
+---
+
+## 13. Launch-readiness spec — Part 7 (2026-08-03)
+
+Printables & exports, per `docs/ever-after-launch-readiness-spec.md`
+Part 7. Seven documents, all Account/couple-only, reusing Part 3's
+rendering machinery per the spec's own instruction rather than building
+a second pipeline. Done, verified live, merged.
+
+**New shared infrastructure, factored out of Part 3's card renderer
+rather than duplicated:**
+- `src/lib/print-theme.ts` — `loadFonts()` and the `COLORS` palette,
+  extracted from `src/lib/invitation-card.tsx` (behavior unchanged),
+  plus a new `contentDisposition()` helper (see the bug below).
+- `src/lib/printable-pdf.tsx` — `renderPagePng()` (generic A4-at-150dpi
+  `next/og` `ImageResponse` wrapper), `assemblePdf()` (new dependency
+  **`pdf-lib`** — pure JS, no native deps, no Web Worker, same constraint
+  that shaped the `jsqr`/`qrcode` choices under Turbopack — embeds each
+  rendered page PNG full-bleed into an A4-point PDF page), and
+  `renderTablePdf()` (paginates arbitrary rows into table pages, shared
+  by the attendee sheet and the processional running order).
+- `src/lib/csv.ts` — `toCsv()`, proper quoting/escaping. Nothing like it
+  existed before; `parseGuestRows` (Part 5) is CSV *parsing*, not
+  generation.
+
+**The seven documents**, all under a new **Printables tab**
+(`src/app/(app)/engagements/[id]/printables/`): table number signage and
+place cards (PDF, one page/grid per table or guest), an attendee sheet
+per checkpoint (PDF, alphabetical + table + tick column — the tab lists
+one link per checkpoint), a day-of call sheet (PDF, suppliers +
+run of show on one page), a caterer headcount export and a full guest
+list export (both CSV), and the processional running order (PDF). Every
+route uses the ordinary RLS-aware `createClient()`, never the
+service-role client, so "unreachable without an authenticated session"
+falls out of existing `guests`/`tables`/`schedule_items`/
+`engagement_vendors`/`processional_entries` RLS for free — no new RLS
+policies, no `verify-rls.mjs` changes needed for this part.
+
+**Theming**: the spec wants place cards and table numbers to follow the
+couple's site theme, house palette for the internal documents. Since
+`sites.theme` is still an unwired `jsonb` stub (same gap Part 3 already
+noted), all seven use the house palette for now — not a new deferral,
+the same one Part 3 recorded.
+
+**Real bug caught live, not just in code review**: `renderTablePdf`'s
+first page for the attendee sheet is titled `"Attendee sheet — {checkpoint
+name}"` — an em dash. A plain `Content-Disposition: attachment;
+filename="..."` header value must be Latin1/ASCII; the em dash threw a
+`TypeError` at the fetch layer (`Cannot convert argument to a ByteString
+because the character at index 49 has a value of 8212...`), a 500 on
+every attendee-sheet download. This wasn't a one-off — every route
+building a filename from a couple's `display_name` or a guest's
+`full_name` had the same latent bug, including Part 3's two existing
+routes (never triggered there only because no seed name happens to
+contain a non-Latin1 character). Fixed with a proper RFC 5987
+`contentDisposition()` helper in `print-theme.ts` (ASCII fallback +
+`filename*=UTF-8''...` for the real name), applied to all nine routes
+that send a download — the two Part 3 ones included, not just the five
+new ones. Caught by actually calling the route in a live walkthrough,
+not by reading the code — the same lesson §6/§10 already draw about live
+verification over reasoning-about-code.
+
+**Verified live**, against both seed engagements: all seven downloaded
+successfully for Maria & Jon (populated) with correct content types and
+non-trivial byte sizes; the caterer headcount and guest list CSV row
+counts matched the guest list tab's own Accepted/Invited counters exactly
+(2 and 11 respectively); for Erick & Erika (sparse), table numbers, place
+cards, and the processional route all degraded to a clean 400 "nothing
+to print" JSON error rather than emitting a broken document, while the
+call sheet and both CSVs still rendered correctly with empty-state
+messaging ("No suppliers logged yet.", header-only CSV) — the spec's own
+"degrades sensibly for a sparse engagement" done-when. `npm run build`
+passes clean. **Still owed**: an actual physical print of the attendee
+sheet and place cards to confirm A4 margins/cut-lines for real — no
+printer available in this environment, same caveat Part 3 already
+recorded for its own QR print-and-scan test.
