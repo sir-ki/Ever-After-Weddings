@@ -227,11 +227,15 @@ still has gaps."
   checklist (§5).
 - `scripts/verify-rls.mjs` — creates throwaway couple/Account users,
   confirms couple A can't reach couple B's data by list, direct id, or
-  write, across `engagements`, `guests`, `sites`, `site_sections`, and (as
-  of M8) `vendors`/`vendor_photos`/`engagement_vendors` — including the
+  write, across `engagements`, `guests`, `sites`, `site_sections`,
+  `vendors`/`vendor_photos`/`engagement_vendors` (as of M8) — including the
   public-read carve-outs (anon can read an approved vendor but not a
   pending one, a credited `engagement_vendors` row but not an uncredited
-  one). 22 checks total.
+  one) — and, as of 2026-08-02, `checkpoints`/`guest_scans`. That last
+  addition specifically exercises the cross-engagement guard fixed in
+  migration `0008`/commit `9652156` (a coordinator's own guest can't be
+  scanned against a checkpoint from a different engagement) — the one real
+  gap this suite had. 30 checks total.
 - `scripts/verify-guest-token-security.mjs` — hits the guest API directly
   over HTTP (not through the UI), confirms guest A's token reveals nothing
   about guest B, no endpoint returns a list, tampered/garbage tokens 404
@@ -246,11 +250,6 @@ Run both after any change touching RLS policies, guest endpoints, or
 npm run verify:rls
 npm run verify:guest-token
 ```
-
-**Gap: neither script covers `checkpoints`/`guest_scans` yet.** Still open
-— M8 closed the equivalent gap for the new vendor tables (see above) but
-didn't retroactively add M7's tables to the suite. Worth folding in before
-real event data goes through the scanner.
 
 **M8's RLS design caught two gaps during planning, before any code
 existed** — worth noting as a contrast to M7, where the equivalent bugs
@@ -325,7 +324,6 @@ spec's revision history
 - **Coordinator "who to ask" block** on the day-of hub only renders if an `engagement_members` row with `role = 'coordinator'` exists *and* that user's `users.phone` is filled in — there's no UI to set phone numbers yet, so this block is currently dark for both seed engagements.
 - **Footer site section** — `docs/ever-after-template-spec.md` describes one; the data model's `site_sections.section_type` check constraint doesn't include `footer`. Skipped rather than guessed at; flagged in the M5 commit.
 - **No profile-editing UI** — see the "Bruce" note in §4.
-- **No automated RLS regression test for `checkpoints`/`guest_scans`** — see the gap note in §6.
 - **No vendor self-service login or editor** — deliberate M8 scope decision, see §5. Adding it later is additive (the schema already has `vendors.owner_user_id`), not a rework.
 - **A handful of Minor-severity findings from M8's task reviews were deliberately deferred**, not fixed — non-numeric `rate_from`/`rate_to` silently becomes `null` instead of erroring; the per-event vendor log's off-platform `business_name` field isn't marked required; notes typed on a directory-linked vendor-log entry are silently discarded (only the off-platform path stores them); `/directory`'s card grid has no responsive breakpoints. None are security- or data-integrity-relevant. Full detail with file:line references in `.superpowers/sdd/2026-08-02-vendor-directory/progress.md` (worktree-local, not committed — see §9).
 

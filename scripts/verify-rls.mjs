@@ -429,6 +429,170 @@ try {
   await admin.from("vendors").delete().eq("id", approvedVendor.id);
 }
 
+// Milestone 7: checkpoints / guest_scans isolation. Never added when M7
+// shipped (see handoff §6/§7) — in particular this is the only script that
+// exercises the guest_scans_all policy's cross-engagement guard added in
+// migration 0008 (commit 9652156): a coordinator must not be able to log a
+// scan using their own guest against a checkpoint from a different
+// engagement.
+const { data: mariaJonCheckpoint } = await admin
+  .from("checkpoints")
+  .insert({ engagement_id: mariaJon.id, name: "RLS Test Checkpoint (M&J)" })
+  .select("id")
+  .single();
+const { data: erickErikaCheckpoint } = await admin
+  .from("checkpoints")
+  .insert({ engagement_id: erickErika.id, name: "RLS Test Checkpoint (E&E)" })
+  .select("id")
+  .single();
+const { data: checkpointTestGuest } = await admin
+  .from("guests")
+  .insert({
+    engagement_id: mariaJon.id,
+    full_name: "RLS Test Guest (Checkpoints)",
+    side: "both",
+  })
+  .select("id")
+  .single();
+const { data: existingScan } = await admin
+  .from("guest_scans")
+  .insert({
+    guest_id: checkpointTestGuest.id,
+    checkpoint_id: mariaJonCheckpoint.id,
+    method: "manual",
+  })
+  .select("id")
+  .single();
+
+const couple3Email = `rls-test-couple3-${Date.now()}@example.com`;
+const couple3Password = "verify-rls-temp-password-1234";
+const { data: created3, error: create3Error } = await admin.auth.admin.createUser({
+  email: couple3Email,
+  password: couple3Password,
+  email_confirm: true,
+  user_metadata: { full_name: "RLS Test Couple 3" },
+});
+if (create3Error) {
+  console.error("Failed to create third test couple:", create3Error.message);
+  process.exit(1);
+}
+const couple3UserId = created3.user.id;
+await admin.from("engagement_members").insert({
+  engagement_id: mariaJon.id,
+  user_id: couple3UserId,
+  role: "coordinator",
+});
+
+let crossEngagementScanId = null;
+try {
+  const asCouple3 = createClient(url, anonKey);
+  const { error: signIn3Error } = await asCouple3.auth.signInWithPassword({
+    email: couple3Email,
+    password: couple3Password,
+  });
+  if (signIn3Error) {
+    console.error("Failed to sign in as third test couple:", signIn3Error.message);
+    process.exit(1);
+  }
+
+  const { data: visibleCheckpoints } = await asCouple3
+    .from("checkpoints")
+    .select("id, engagement_id");
+  const visibleCheckpointIds = new Set(visibleCheckpoints?.map((c) => c.id));
+  check(
+    "couple's checkpoint list is scoped to their own engagement",
+    visibleCheckpoints?.every((c) => c.engagement_id === mariaJon.id) &&
+      visibleCheckpointIds.has(mariaJonCheckpoint.id) &&
+      !visibleCheckpointIds.has(erickErikaCheckpoint.id),
+  );
+
+  const { data: otherCheckpointFetch } = await asCouple3
+    .from("checkpoints")
+    .select("id")
+    .eq("id", erickErikaCheckpoint.id)
+    .maybeSingle();
+  check(
+    "couple cannot fetch the other engagement's checkpoint by id",
+    otherCheckpointFetch === null,
+  );
+
+  const { data: ownCheckpointInsert, error: ownCheckpointInsertError } = await asCouple3
+    .from("checkpoints")
+    .insert({ engagement_id: mariaJon.id, name: "Couple-Added Checkpoint" })
+    .select("id")
+    .maybeSingle();
+  check(
+    "couple can add a checkpoint to their own engagement",
+    !ownCheckpointInsertError && !!ownCheckpointInsert,
+  );
+  if (ownCheckpointInsert) {
+    await admin.from("checkpoints").delete().eq("id", ownCheckpointInsert.id);
+  }
+
+  const { error: crossCheckpointInsertError } = await asCouple3.from("checkpoints").insert({
+    engagement_id: erickErika.id,
+    name: "should not be allowed",
+  });
+  check(
+    "couple cannot add a checkpoint to another engagement",
+    crossCheckpointInsertError !== null,
+  );
+
+  const { data: visibleScans } = await asCouple3
+    .from("guest_scans")
+    .select("id, guest_id");
+  const visibleScanIds = new Set(visibleScans?.map((s) => s.id));
+  check(
+    "couple's guest_scans list is scoped to their own engagement",
+    visibleScanIds.has(existingScan.id),
+  );
+
+  // The migration-0008 bug: guest belongs to the caller's engagement, but
+  // the checkpoint belongs to a different one. Must be rejected.
+  const { data: crossScan, error: crossScanError } = await asCouple3
+    .from("guest_scans")
+    .insert({
+      guest_id: checkpointTestGuest.id,
+      checkpoint_id: erickErikaCheckpoint.id,
+      method: "manual",
+    })
+    .select("id")
+    .maybeSingle();
+  crossEngagementScanId = crossScan?.id ?? null;
+  check(
+    "couple cannot log a scan for their own guest against another engagement's checkpoint",
+    crossScanError !== null && !crossScan,
+  );
+
+  const { data: ownScanInsert, error: ownScanInsertError } = await asCouple3
+    .from("guest_scans")
+    .insert({
+      guest_id: checkpointTestGuest.id,
+      checkpoint_id: mariaJonCheckpoint.id,
+      method: "manual",
+    })
+    .select("id")
+    .maybeSingle();
+  // Expected to fail too — this guest/checkpoint pair was already scanned
+  // by the admin fixture above, and the unique index forbids a duplicate.
+  // What matters here is that RLS itself doesn't block it; the 23505
+  // unique-violation is the only reason it's rejected.
+  check(
+    "couple can attempt a scan for their own guest/checkpoint pair (rejected only by the unique constraint, not RLS)",
+    ownScanInsertError?.code === "23505" && !ownScanInsert,
+  );
+} finally {
+  if (crossEngagementScanId) {
+    await admin.from("guest_scans").delete().eq("id", crossEngagementScanId);
+  }
+  await admin.from("guest_scans").delete().eq("id", existingScan.id);
+  await admin.from("guests").delete().eq("id", checkpointTestGuest.id);
+  await admin.from("checkpoints").delete().eq("id", mariaJonCheckpoint.id);
+  await admin.from("checkpoints").delete().eq("id", erickErikaCheckpoint.id);
+  await admin.from("engagement_members").delete().eq("user_id", couple3UserId);
+  await admin.auth.admin.deleteUser(couple3UserId);
+}
+
 const secondAccountEmail = `rls-test-account-${Date.now()}@example.com`;
 const secondAccountPassword = "verify-rls-temp-password-1234";
 
@@ -458,6 +622,17 @@ if (promoteSecondAccountError) {
   process.exit(1);
 }
 
+const { data: accountCheckpointMJ } = await admin
+  .from("checkpoints")
+  .insert({ engagement_id: mariaJon.id, name: "RLS Test Account Checkpoint (M&J)" })
+  .select("id")
+  .single();
+const { data: accountCheckpointEE } = await admin
+  .from("checkpoints")
+  .insert({ engagement_id: erickErika.id, name: "RLS Test Account Checkpoint (E&E)" })
+  .select("id")
+  .single();
+
 try {
   const asSecondAccount = createClient(url, anonKey);
   const { error: signInError } = await asSecondAccount.auth.signInWithPassword({
@@ -478,7 +653,18 @@ try {
     "a second Account user sees every engagement",
     ids.has(mariaJon.id) && ids.has(erickErika.id),
   );
+
+  const { data: checkpointsForAccount } = await asSecondAccount
+    .from("checkpoints")
+    .select("id");
+  const checkpointIds = new Set(checkpointsForAccount?.map((c) => c.id));
+  check(
+    "a second Account user sees checkpoints across every engagement",
+    checkpointIds.has(accountCheckpointMJ.id) && checkpointIds.has(accountCheckpointEE.id),
+  );
 } finally {
+  await admin.from("checkpoints").delete().eq("id", accountCheckpointMJ.id);
+  await admin.from("checkpoints").delete().eq("id", accountCheckpointEE.id);
   await admin.auth.admin.deleteUser(secondAccount.user.id);
 }
 
