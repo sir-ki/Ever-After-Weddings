@@ -7,6 +7,7 @@
 // local dev server — run `npm run dev` first).
 // Usage: node --env-file=.env.local scripts/verify-guest-token-security.mjs
 import { createClient } from "@supabase/supabase-js";
+import { randomBytes } from "crypto";
 
 const BASE_URL = process.env.BASE_URL || "http://localhost:3000";
 
@@ -148,7 +149,36 @@ try {
       dbGuestA?.contact_phone === "0917 000 0000",
   );
 
-  const resBadStatus = await hit(`/api/g/${guestA.invite_token}/rsvp`, {
+  // Launch-readiness spec Part 2: rotating a guest's token (the same
+  // "Regenerate link" action src/app/(app)/engagements/[id]/guests/actions.ts
+  // exposes) must kill the old link immediately, no grace period, and the
+  // new one must resolve to the same guest with RSVP/table data intact.
+  const oldTokenA = guestA.invite_token;
+  const rotatedTokenA = randomBytes(16).toString("base64url");
+  const { error: rotateError } = await admin
+    .from("guests")
+    .update({ invite_token: rotatedTokenA })
+    .eq("id", guestA.id);
+  if (rotateError) {
+    console.error("Failed to rotate guest A's token:", rotateError.message);
+    process.exit(1);
+  }
+
+  const resOldToken = await hit(`/api/g/${oldTokenA}`);
+  check("the old token 404s immediately after rotation", resOldToken.status === 404);
+
+  const resNewToken = await hit(`/api/g/${rotatedTokenA}`);
+  const bodyNewToken = await resNewToken.json();
+  check("the new token resolves with a 200", resNewToken.status === 200);
+  check(
+    "the new token's data (RSVP status, contact) survived rotation intact",
+    bodyNewToken.guest?.rsvp_status === "accepted" &&
+      bodyNewToken.guest?.contact_phone === "0917 000 0000",
+  );
+
+  // guestA.invite_token was rotated above — every check from here on uses
+  // rotatedTokenA, the only token that still resolves to this guest.
+  const resBadStatus = await hit(`/api/g/${rotatedTokenA}/rsvp`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rsvp_status: "maybe" }),
@@ -157,7 +187,7 @@ try {
 
   let sawRateLimited = false;
   for (let i = 0; i < 35; i++) {
-    const res = await hit(`/api/g/${guestA.invite_token}`);
+    const res = await hit(`/api/g/${rotatedTokenA}`);
     if (res.status === 429) {
       sawRateLimited = true;
       break;

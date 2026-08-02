@@ -2,7 +2,16 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
+
+// Same shape as guests.invite_token's own column default
+// (supabase/migrations/0003_guest_tokens.sql): 16 random bytes, base64url,
+// unpadded. Generated here instead of relying on the column default so a
+// plain `.update()` through the RLS-scoped client can set it directly.
+function newInviteToken() {
+  return randomBytes(16).toString("base64url");
+}
 
 function guestFields(formData: FormData) {
   return {
@@ -91,6 +100,58 @@ export async function unarchiveGuest(formData: FormData) {
   await supabase.from("guests").update({ archived_at: null }).eq("id", guestId);
 
   revalidatePath(`/engagements/${engagementId}`);
+}
+
+// Launch-readiness spec Part 2: a leaked guest link can't be revoked
+// today. Rotating replaces invite_token immediately — lookup is by exact
+// match, so the old token is dead the instant this commits, no grace
+// period. guests_invite_token_key (unique index, 0003_guest_tokens.sql) is
+// the collision backstop; at 128 bits this is theoretical, but retry once
+// on a 23505 before giving up, same defensive style as
+// checkpoints/actions.ts's scan race handling.
+export async function rotateGuestToken(formData: FormData) {
+  const engagementId = formData.get("engagement_id") as string;
+  const guestId = formData.get("guest_id") as string;
+  const supabase = await createClient();
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { error } = await supabase
+      .from("guests")
+      .update({ invite_token: newInviteToken() })
+      .eq("id", guestId);
+    if (!error) break;
+    if (error.code !== "23505" || attempt === 2) {
+      redirect(
+        `/engagements/${engagementId}/guests/${guestId}/edit?error=${encodeURIComponent("Could not regenerate the link. Please try again.")}`,
+      );
+    }
+  }
+
+  revalidatePath(`/engagements/${engagementId}`);
+  redirect(`/engagements/${engagementId}/guests/${guestId}/edit?rotated=1`);
+}
+
+export async function rotateAllGuestTokens(formData: FormData) {
+  const engagementId = formData.get("engagement_id") as string;
+  const supabase = await createClient();
+
+  const { data: guests } = await supabase
+    .from("guests")
+    .select("id")
+    .eq("engagement_id", engagementId);
+
+  for (const guest of guests ?? []) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { error } = await supabase
+        .from("guests")
+        .update({ invite_token: newInviteToken() })
+        .eq("id", guest.id);
+      if (!error || error.code !== "23505" || attempt === 2) break;
+    }
+  }
+
+  revalidatePath(`/engagements/${engagementId}`);
+  redirect(`/engagements/${engagementId}?tab=guests&rotated_all=1`);
 }
 
 const VALID_SIDES = ["bride", "groom", "both"];

@@ -8,16 +8,16 @@ export default async function EditGuestPage({
   searchParams,
 }: {
   params: Promise<{ id: string; guestId: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; rotated?: string }>;
 }) {
   const { id, guestId } = await params;
-  const { error } = await searchParams;
+  const { error, rotated } = await searchParams;
   const supabase = await createClient();
 
   const { data: guest } = await supabase
     .from("guests")
     .select(
-      "id, full_name, side, guest_group, contact_phone, guest_notes, rsvp_status, table_id",
+      "id, full_name, side, guest_group, contact_phone, guest_notes, rsvp_status, table_id, invite_token",
     )
     .eq("id", guestId)
     .eq("engagement_id", id)
@@ -41,9 +41,27 @@ export default async function EditGuestPage({
       >
         ← Guest list
       </Link>
-      <h1 className="mb-6 mt-2 text-xl font-semibold text-neutral-900">
+      <h1 className="mb-2 mt-2 text-xl font-semibold text-neutral-900">
         Edit guest
       </h1>
+
+      {rotated && (
+        <p className="mb-4 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
+          Link regenerated. The old link no longer works.
+        </p>
+      )}
+
+      <div className="mb-6 flex items-center justify-between rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
+        <span className="truncate text-neutral-600">
+          /r/{guest.invite_token}
+        </span>
+        <Link
+          href={`/engagements/${id}/guests/${guestId}/rotate`}
+          className="ml-3 shrink-0 text-neutral-500 hover:text-neutral-900 hover:underline"
+        >
+          Regenerate link
+        </Link>
+      </div>
 
       <form action={updateGuest} className="space-y-4">
         <input type="hidden" name="engagement_id" value={id} />
