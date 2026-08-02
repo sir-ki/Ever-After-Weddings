@@ -37,10 +37,13 @@ export default async function AppLayout({
                 Vendors
               </Link>
             )}
-            <span className="text-sm text-neutral-500">
+            <Link
+              href="/profile"
+              className="text-sm text-neutral-500 hover:text-neutral-900"
+            >
               {profile?.full_name || user.email} ·{" "}
               {profile?.global_role ?? "no role"}
-            </span>
+            </Link>
             <form action={signOut}>
               <button
                 type="submit"

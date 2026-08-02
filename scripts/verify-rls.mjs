@@ -227,6 +227,116 @@ try {
   await admin.auth.admin.deleteUser(testUserId);
 }
 
+// 2026-08-02: users self-update (profile page). A user can now update
+// their own full_name/phone (migration 0010) — but global_role lives on
+// the same row, and migration 0007 already fixed one privilege-escalation
+// bug from trusting client-controlled data on this table. The
+// lock_self_update_sensitive_columns trigger, not RLS, is what's supposed
+// to stop a self-update from also changing global_role/email — confirm it
+// actually does.
+const selfUpdateEmail = `rls-test-selfupdate-${Date.now()}@example.com`;
+const selfUpdatePassword = "verify-rls-temp-password-1234";
+const { data: selfUpdateCreated, error: selfUpdateCreateError } =
+  await admin.auth.admin.createUser({
+    email: selfUpdateEmail,
+    password: selfUpdatePassword,
+    email_confirm: true,
+    user_metadata: { full_name: "RLS Test Self-Update" },
+  });
+if (selfUpdateCreateError) {
+  console.error("Failed to create self-update test user:", selfUpdateCreateError.message);
+  process.exit(1);
+}
+const selfUpdateUserId = selfUpdateCreated.user.id;
+
+const otherSelfUpdateEmail = `rls-test-selfupdate-other-${Date.now()}@example.com`;
+const { data: otherSelfUpdateCreated, error: otherSelfUpdateCreateError } =
+  await admin.auth.admin.createUser({
+    email: otherSelfUpdateEmail,
+    password: selfUpdatePassword,
+    email_confirm: true,
+    user_metadata: { full_name: "RLS Test Self-Update Other" },
+  });
+if (otherSelfUpdateCreateError) {
+  console.error(
+    "Failed to create second self-update test user:",
+    otherSelfUpdateCreateError.message,
+  );
+  process.exit(1);
+}
+const otherSelfUpdateUserId = otherSelfUpdateCreated.user.id;
+
+try {
+  const asSelfUpdateUser = createClient(url, anonKey);
+  const { error: selfUpdateSignInError } = await asSelfUpdateUser.auth.signInWithPassword({
+    email: selfUpdateEmail,
+    password: selfUpdatePassword,
+  });
+  if (selfUpdateSignInError) {
+    console.error("Failed to sign in as self-update test user:", selfUpdateSignInError.message);
+    process.exit(1);
+  }
+
+  await asSelfUpdateUser
+    .from("users")
+    .update({ full_name: "Updated Name", phone: "555-0100" })
+    .eq("id", selfUpdateUserId);
+  const { data: afterNameUpdate } = await admin
+    .from("users")
+    .select("full_name, phone")
+    .eq("id", selfUpdateUserId)
+    .single();
+  check(
+    "user can update their own full_name and phone",
+    afterNameUpdate?.full_name === "Updated Name" && afterNameUpdate?.phone === "555-0100",
+  );
+
+  await asSelfUpdateUser
+    .from("users")
+    .update({ global_role: "account" })
+    .eq("id", selfUpdateUserId);
+  const { data: afterRoleEscalation } = await admin
+    .from("users")
+    .select("global_role")
+    .eq("id", selfUpdateUserId)
+    .single();
+  check(
+    "user cannot escalate their own global_role via self-update",
+    afterRoleEscalation?.global_role === "couple",
+  );
+
+  await asSelfUpdateUser
+    .from("users")
+    .update({ email: "hacked@example.com" })
+    .eq("id", selfUpdateUserId);
+  const { data: afterEmailChange } = await admin
+    .from("users")
+    .select("email")
+    .eq("id", selfUpdateUserId)
+    .single();
+  check(
+    "user cannot change their own email via self-update",
+    afterEmailChange?.email === selfUpdateEmail,
+  );
+
+  await asSelfUpdateUser
+    .from("users")
+    .update({ full_name: "hacked" })
+    .eq("id", otherSelfUpdateUserId);
+  const { data: otherAfterCrossUpdate } = await admin
+    .from("users")
+    .select("full_name")
+    .eq("id", otherSelfUpdateUserId)
+    .single();
+  check(
+    "user cannot update another user's row",
+    otherAfterCrossUpdate?.full_name !== "hacked",
+  );
+} finally {
+  await admin.auth.admin.deleteUser(selfUpdateUserId);
+  await admin.auth.admin.deleteUser(otherSelfUpdateUserId);
+}
+
 // Milestone 8: vendors / vendor_photos / engagement_vendors isolation,
 // including the public-read carve-outs (approved vendors, credited
 // engagement_vendors) that no other script exercises.

@@ -56,7 +56,7 @@ for the write-up.
 
 ## 3. Database
 
-Nine migrations, in `supabase/migrations/`, all applied to the live
+Eleven migrations, in `supabase/migrations/`, all applied to the live
 Supabase project in order:
 
 1. `0001_init.sql` — `users`, `engagements`, `engagement_members`, RLS helpers (`is_account()`, `has_engagement()`)
@@ -68,6 +68,8 @@ Supabase project in order:
 7. `0007_fix_role_privilege_escalation.sql` — closes a critical bug, see §6
 8. `0008_checkpoints_scanning.sql` — `checkpoints`, `guest_scans`, unique `(checkpoint_id, guest_id)` index, `guest_engagement_id()` / `checkpoint_engagement_id()` helpers
 9. `0009_vendor_directory.sql` — `vendors`, `vendor_photos`, `engagement_vendors`; `vendor_is_approved()` helper; `engagement_vendors` RLS is split by operation (not one `for all`) specifically so its read policy can be broader than its write policy — see §5.
+10. `0010_users_self_update.sql` — self-service profile editing: `users_update_self` RLS policy plus `lock_self_update_sensitive_columns` trigger to keep `global_role`/`email`/`archived_at` Account-only — see §5.
+11. `0011_fix_users_self_update_trigger.sql` — fixes `0010`'s trigger, which also blocked legitimate service-role writes — see the bug writeup in §6.
 
 **Not yet in the schema**: `media` (post-v1, deferred — see the data model doc).
 
@@ -96,11 +98,8 @@ Re-seed with `npm run seed` (adds the two engagements if missing; skips if
 they already exist).
 
 **The one Account login**: `brulkeanjames@gmail.com`, password shared
-earlier in an unlogged session. `full_name` on that user is still literally
-"Bruce" — a placeholder I guessed and the user never corrected. Worth
-fixing before this goes anywhere real; there's no profile-edit UI yet, so
-it needs a direct `update users set full_name = '...' where email = ...`
-in the SQL editor, or a quick script.
+earlier in an unlogged session. `full_name` is now "Account Admin" (was
+literally "Bruce", a placeholder guess — see 2026-08-02 fix below).
 
 ---
 
@@ -212,6 +211,19 @@ pre-existing section type, so re-saving hero/story/the_day/rsvp/gallery/
 details is a true no-op for that column — verified live against Maria &
 Jon's site (created back in M5), not just reasoned about.
 
+**Self-service profile editing (`/profile`, migrations `0010`/`0011`,
+2026-08-02) uses a DB trigger to scope which columns a self-update can
+touch, not RLS column privileges.** `users.global_role` lives on the same
+row as `full_name`/`phone`, and RLS `using`/`with check` clauses can't be
+scoped per-column — so a plain "allow self-update" policy would reopen the
+exact privilege-escalation class migration `0007` fixed. Instead, the RLS
+policy allows any authenticated user to update their own row, and a
+`before update` trigger (`lock_self_update_sensitive_columns`) pins
+`global_role`/`email`/`archived_at` back to their old values unless the
+caller is Account. The trigger must gate on `auth.role() = 'authenticated'`
+(not just `not is_account()`) — see the bug this caused and the `0011`
+fix in §6.
+
 ---
 
 ## 6. Security posture
@@ -316,6 +328,21 @@ spec's revision history
    `null` — every real tab already had its own branch above it, so nothing
    about real behavior changed.
 
+5. (migrations `0010`/`0011`, 2026-08-02) **Self-update trigger blocked
+   legitimate service-role writes, caught immediately by `verify-rls.mjs`
+   regressing.** Migration `0010` added self-service profile editing
+   (`/profile`, §5) via a trigger (`lock_self_update_sensitive_columns`)
+   meant to stop a user from escalating their own `global_role` on
+   self-update — the same class of bug migration `0007` fixed. The
+   trigger's condition was `not is_account()`, but `is_account()` is also
+   false for the service-role client (`auth.uid()` is null with no
+   session) — so it silently pinned `global_role` back to its old value
+   even when `scripts/create-account-user.mjs` or `verify-rls.mjs`'s admin
+   client did the update. The very next `verify:rls` run caught it (the
+   "second Account user" checks failed) before it reached any real
+   workflow. Fixed in `0011` by scoping the lock to `auth.role() =
+   'authenticated'`, so service-role writes are unaffected.
+
 ---
 
 ## 7. Known gaps / deliberate deferrals
@@ -323,7 +350,6 @@ spec's revision history
 - **Token rotation UI** — regenerating a guest's link if it leaks. Explicitly listed as "still open" in the auth doc, not attempted.
 - **Coordinator "who to ask" block** on the day-of hub only renders if an `engagement_members` row with `role = 'coordinator'` exists *and* that user's `users.phone` is filled in — there's no UI to set phone numbers yet, so this block is currently dark for both seed engagements.
 - **Footer site section** — `docs/ever-after-template-spec.md` describes one; the data model's `site_sections.section_type` check constraint doesn't include `footer`. Skipped rather than guessed at; flagged in the M5 commit.
-- **No profile-editing UI** — see the "Bruce" note in §4.
 - **No vendor self-service login or editor** — deliberate M8 scope decision, see §5. Adding it later is additive (the schema already has `vendors.owner_user_id`), not a rework.
 - **A handful of Minor-severity findings from M8's task reviews were deliberately deferred**, not fixed — non-numeric `rate_from`/`rate_to` silently becomes `null` instead of erroring; the per-event vendor log's off-platform `business_name` field isn't marked required; notes typed on a directory-linked vendor-log entry are silently discarded (only the off-platform path stores them); `/directory`'s card grid has no responsive breakpoints. None are security- or data-integrity-relevant. Full detail with file:line references in `.superpowers/sdd/2026-08-02-vendor-directory/progress.md` (worktree-local, not committed — see §9).
 
