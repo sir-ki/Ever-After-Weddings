@@ -12,6 +12,15 @@ doc is *where things currently stand*.
 and deployed to production. §9 has the detail on how M8 was built, for
 context on that milestone's commit history.
 
+**2026-08-02, post-M8: a short hardening pass closed the punch list of
+fixable-now gaps** — RLS coverage for `checkpoints`/`guest_scans`,
+self-service profile editing (and the "Bruce" placeholder fix), and all
+four of M8's deferred minor findings. See §6 and §7 for detail. What's
+left in §7 are real features (invite flow, token rotation, etc.), not
+quick fixes — each needs its own scoping pass, not a punch-list treatment.
+§10 covers the workflow this pass used, since it's a deliberate change
+from how M0–M8 were built.
+
 ---
 
 ## 1. Live pieces
@@ -347,8 +356,14 @@ spec's revision history
 
 ## 7. Known gaps / deliberate deferrals
 
-- **Token rotation UI** — regenerating a guest's link if it leaks. Explicitly listed as "still open" in the auth doc, not attempted.
-- **Coordinator "who to ask" block** on the day-of hub only renders if an `engagement_members` row with `role = 'coordinator'` exists *and* that user's `users.phone` is filled in — there's no UI to set phone numbers yet, so this block is currently dark for both seed engagements.
+Everything that was fixable as a self-contained punch-list item was closed
+2026-08-02 (see §6's bug #5 and the "fixed" note below). What's left below
+is real feature scope — each one needs its own design/plan pass before
+implementation, not a quick patch.
+
+- **Token rotation UI** — regenerating a guest's link if it leaks. Explicitly listed as "still open" in the auth doc, not attempted. The only remaining item with real security relevance (a leaked link currently can't be revoked) — recommended next if picking one.
+- **No member-invite flow** — bigger than it first looks. The auth doc says couples/coordinators are "invited by Account, creating an `engagement_members` row at the same time" (`docs/ever-after-auth-and-access.md:227`), but no UI implements this anywhere, not even for couples — the two seed engagements' members were created directly via `scripts/seed.mjs`/SQL, not through the app. This blocks the item below.
+- **Coordinator "who to ask" block** on the day-of hub only renders if an `engagement_members` row with `role = 'coordinator'` exists *and* that user's `users.phone` is filled in. `/profile` (added 2026-08-02) now lets any signed-in user set their own phone, so the phone-number half of this gap is closed — but there's still no way to get a coordinator attached to an engagement in the first place (see the member-invite gap above), so this block stays dark for both seed engagements.
 - **Footer site section** — `docs/ever-after-template-spec.md` describes one; the data model's `site_sections.section_type` check constraint doesn't include `footer`. Skipped rather than guessed at; flagged in the M5 commit.
 - **No vendor self-service login or editor** — deliberate M8 scope decision, see §5. Adding it later is additive (the schema already has `vendors.owner_user_id`), not a rework.
 - ~~A handful of Minor-severity findings from M8's task reviews were deliberately deferred~~ — **fixed 2026-08-02**: non-numeric `rate_from`/`rate_to` now redirects with an error instead of silently becoming `null` (`src/lib/parse-rate.ts`, used by both `directory/apply/actions.ts` and `(app)/vendors/actions.ts`); the per-event vendor log's off-platform `business_name` is now required server-side (`(app)/engagements/[id]/vendors/actions.ts`); notes on a directory-linked vendor-log entry are no longer discarded (both insert branches now pass `notes` through); `/directory`'s card grid is now `grid-cols-1 sm:grid-cols-2`. Fixing the required-field/rate validation surfaced a small pre-existing gap in the same code — action success paths only called `revalidatePath`, never `redirect`, so a prior error left in the URL's `?error=` param would stick around after a subsequent successful submit; both `addEngagementVendor` and `updateVendor` now redirect on success too.
@@ -417,3 +432,35 @@ first). Ask rather than assume. After merging, the usual production
 deploy is automatic (Vercel auto-deploys `main`) — no separate deploy step,
 but worth a quick check that the build succeeds on Vercel the way it does
 locally, same as every prior milestone's push.
+
+---
+
+## 10. Workflow going forward (post-`superpowers`)
+
+M0–M8 (and the first part of M8's Tasks 1–7) used the `superpowers`
+plugin: `brainstorming` → `writing-plans` → `subagent-driven-development`
+(fresh implementer + independent reviewer subagent per task). Partway
+through M8 the user asked to stop using that per-task subagent dispatch —
+it had also been uninstalled from the environment around the same time —
+and Tasks 8–9 switched to direct plan-mode work instead. The 2026-08-02
+hardening pass (see the top of this doc, §6 bug #5, §7) confirmed that as
+the going-forward default:
+
+- No more `superpowers` slash-commands or per-task subagent dispatch.
+- Plan mode is the approval gate: propose a plan, get explicit sign-off,
+  implement directly in-session.
+- For anything non-trivial (new table, new RLS policy, new route
+  surface), still write a short design/plan doc — the value wasn't the
+  `superpowers` plugin, it was having a written record of *why* a
+  decision was made before code existed. M8's own two RLS gaps (§6) were
+  caught specifically because the design spec forced tracing through the
+  data flow before implementation. Commit design notes alongside the
+  implementation rather than as a separate ceremony step; `docs/` (not
+  `docs/superpowers/`) is the natural home for anything post-`superpowers`.
+- Same verification bar as always: real diffs read line-by-line, `npm run
+  build`, `npm run verify:rls` (extend it when the change touches a new
+  table/policy), and a live browser walkthrough of the actual change —
+  nothing taken on the strength of a report alone. The 2026-08-02 pass
+  caught two real bugs this way (§6 bug #5, and a stale-error-banner UX
+  issue in the M8 minor-findings fix) that would have shipped unnoticed
+  without live verification.
