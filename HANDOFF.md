@@ -1,119 +1,18 @@
 # Ever After — Handoff
 
-Status snapshot as of Milestone 7, **plus Milestone 8 in progress, paused
-mid-session — read §0 first.** Written for whoever picks this up next — a
-contractor resuming M8, a future session of this same project, or the
-founder coming back after a break.
+Status snapshot as of Milestone 8. Written for whoever picks this up next —
+a contractor scoping post-v1 work, a future session of this same project,
+or the founder coming back after a break.
 
 Companion to `docs/ever-after-build-plan.md`, which this follows milestone by
 milestone. Read that first for *why* the work is sequenced this way; this
 doc is *where things currently stand*.
 
----
-
-## 0. Milestone 8 status — IN PROGRESS, paused mid-session
-
-**This file is inside a git worktree, not the main checkout.** Location:
-`.claude/worktrees/vendor-directory` off the main repo, branch
-`worktree-vendor-directory`, 9 commits ahead of local `main`. **Nothing
-here is pushed to origin or merged** — `main` on GitHub still shows M7 as
-the latest milestone. If you're a future session picking this up, either
-resume in this same worktree or re-derive it: the branch and its commits
-only exist locally right now.
-
-**Why a worktree at all:** the user chose isolation for this milestone
-specifically (asked explicitly when M7 and both security fixes had gone
-straight to `main`) — see the plan doc's own note on this decision.
-
-**Process being followed:** `superpowers:brainstorming` →
-`superpowers:writing-plans` → `superpowers:subagent-driven-development`
-(fresh implementer subagent per task, independent task-reviewer subagent
-per task, fix-loop on Important/Critical findings). Two artifacts this
-process produced, both committed to this branch:
-- Design spec: `docs/superpowers/specs/2026-08-02-vendor-directory-design.md`
-- Implementation plan (9 tasks, full code for each): `docs/superpowers/plans/2026-08-02-vendor-directory.md`
-
-**Progress ledger** (task-by-task history: fix rounds, findings, review
-verdicts, commit ranges): `.superpowers/sdd/2026-08-02-vendor-directory/progress.md`.
-**This file is gitignored — worktree-local only.** It will not survive if
-this worktree is deleted (`git worktree remove` / `ExitWorktree` with
-`action: "remove"`). If you need its history preserved, copy it out or
-paste it into a commit message before removing the worktree.
-
-**⚠️ Mid-session environment change:** the `superpowers` Claude Code plugin
-was uninstalled partway through this work (its skills and helper scripts —
-`scripts/task-brief`, `scripts/review-package`, `scripts/sdd-workspace` —
-disappeared from `~/.claude/plugins/cache/claude-plugins-official/`). The
-plan, spec, and ledger files were unaffected (they're normal repo files,
-not plugin state) and Tasks 1–7 plus an out-of-band regression fix had
-already gone through the full dispatch-implement-review-fix-loop process
-before this happened. After the plugin vanished, the same review discipline
-continued manually — diffs generated with plain `git log`/`git diff -U10`
-redirected to a file instead of the plugin's `review-package` script,
-review subagents dispatched with the same rigor via hand-written prompts.
-If the plugin is still missing when you resume, do the same: you don't
-need it to finish this, just replicate what it automated.
-
-### Task status (plan has 9 tasks total)
-
-| # | Task | Status |
-|---|---|---|
-| 1 | Migration `0009_vendor_directory.sql` (`vendors`, `vendor_photos`, `engagement_vendors` + RLS) | ✅ Done, reviewed clean. **Already applied to the live Supabase project** (`soagkxplguuuowgnnnsq`) — the same shared database `main` uses. The schema exists in production right now even though the code isn't merged. |
-| 2 | Extend `scripts/verify-rls.mjs` with vendor isolation checks | ✅ Done, reviewed clean (22/22 checks pass) |
-| 3 | Vendor signup (`/directory/apply`) | ✅ Done, 1 fix round (report accuracy only, code was already correct), reviewed clean |
-| 4 | Public vendor directory (`/directory`) | ✅ Done, reviewed clean |
-| 5 | Account approval queue (`/vendors`) | ✅ Done, 1 fix round (report accuracy only, code was already correct), reviewed clean |
-| 6 | Header nav link (Account-only "Vendors" link) | ✅ Done, reviewed clean |
-| 7 | Per-event vendor log tab | ✅ Done, reviewed clean |
-| — | *(out-of-band)* Fix dead fallback branch in `engagements/[id]/page.tsx` | ✅ Done, reviewed clean. Task 7 made the tab-switch ternary exhaustive (all 7 `TABS` entries now have explicit branches), which made the old "lands in Milestone N" placeholder branch unreachable — TypeScript correctly flagged it as `never`. Caught by Task 8's implementer, fixed as its own isolated commit, independently reviewed. Commits `ace28e7..5ccf2c9`. |
-| 8 | Suppliers site section (editor + renderer) — the most cross-cutting task: modifies the shared `SiteRenderer` component (used by both `/s/[slug]` and the site-tab preview) and changes `updateSiteSection` from `.update()` to `.upsert()` | **Implemented** (commit `ace28e7`), lint/build clean, implementer's own browser walkthrough reported passing. **Review was in progress and got interrupted before a verdict landed** — a review-package diff was generated (`.superpowers/sdd/2026-08-02-vendor-directory/review-f2e63c6..ace28e7.diff`) and a reviewer subagent was dispatched but the session was interrupted mid-call, so **no review verdict exists yet for this task's own diff**. This is the very next step. |
-| 9 | Final verification pass (full `lint`/`build`/`verify:rls`, cookie-free curl sweep of every new route, end-to-end manual walkthrough, update this handoff doc for the real M8 completion) | Not started |
-
-### Exact next step
-
-1. Dispatch (or redo) the Task 8 review. The diff file already exists at
-   `.superpowers/sdd/2026-08-02-vendor-directory/review-f2e63c6..ace28e7.diff`
-   (base `f2e63c6`, head `ace28e7` — **not** `5ccf2c9`, which is the
-   separate out-of-band fix reviewed independently). The implementer's
-   report is at `.superpowers/sdd/2026-08-02-vendor-directory/task-8-report.md`.
-   Task 8's full brief is at `.superpowers/sdd/2026-08-02-vendor-directory/task-8-brief.md`,
-   or read Task 8 directly from the plan doc.
-2. Specific things worth extra scrutiny in that review, per the plan's own
-   risk assessment: does `SECTION_SORT_ORDER` in `site/actions.ts` exactly
-   match what `createSite`'s `defaultSections` already assigns for the
-   pre-existing section types (a mismatch would silently reorder existing
-   sites' sections on next save)? Is the new `suppliers` prop passed by
-   *both* `SiteRenderer` callers? Does `/s/[slug]/page.tsx`'s new query use
-   the plain session client, not the admin client? The implementer's
-   dispatch ran without the safety classifier available (flagged by a
-   system note at the time) — treat that report's claims with extra
-   skepticism, same as this handoff's process notes above.
-3. Handle any fix-loop rounds the same way Tasks 3 and 5 needed (both had
-   Important findings about report accuracy, not actual code bugs — see the
-   ledger for exactly how those were resolved, as a template).
-4. Once Task 8 is clean, do Task 9 (final verification), including turning
-   this §0 back into a normal "✅ Done" row in the milestones table below
-   and rewriting this handoff the way M7's completion was written up in
-   §6/§7 below — this section (§0) should not exist in the final version.
-5. Only after Task 9 is clean and the user's reviewed it: merge this branch
-   into `main` (the user has not yet been asked how they want that done —
-   ask, don't assume `git merge` vs. a PR).
-
-### Dev server / environment state
-
-A `next dev` server was left running on `http://localhost:3000` from
-within this worktree (started via plain `npm run dev &`, not the
-`Claude_Browser` preview tooling). It may or may not still be running by
-the time you resume — check with `curl -s -o /dev/null -w "%{http_code}"
-http://localhost:3000/` before assuming either way, and restart with `npm
-run dev` from this worktree directory if needed. `.env.local` was manually
-copied into this worktree (it's gitignored, so a fresh worktree won't have
-it) — copy it again from the main checkout if you recreate the worktree.
-
-An authenticated Account browser session (`brulkeanjames@gmail.com`) was
-open in the `Claude_Browser` pane, tab "tab-1", pointed at this worktree's
-dev server — useful for picking up live verification without needing
-credentials again, if that session is still alive.
+**⚠️ M8 is code-complete and verified, but lives on branch
+`worktree-vendor-directory` (a git worktree at
+`.claude/worktrees/vendor-directory`), not yet merged into `main` or pushed
+to origin.** `main` on GitHub still shows M7 as the latest milestone. See
+§9 for exactly what's on this branch and what merging it involves.
 
 ---
 
@@ -135,7 +34,7 @@ handlers. Never import that admin client from anything client-side.
 
 ---
 
-## 2. What's built (Milestones 0–7)
+## 2. What's built (Milestones 0–8)
 
 | Milestone | State | Notes |
 |---|---|---|
@@ -147,18 +46,23 @@ handlers. Never import that admin client from anything client-side.
 | 5 — The wedding site | ✅ Done | One template, draft/publish, `/s/[slug]` |
 | 6 — Day-of hub | ✅ Done | `/r/[token]/day`, announcements, run of show |
 | 7 — Checkpoints & scanning | ✅ Done | Checkpoint CRUD, QR + manual scanner, live derived counts — see §6 for a real RLS bug caught while building this |
-| 8 — Vendor directory | Not started | No dependents, no fixed deadline |
+| 8 — Vendor directory | ✅ Done, **on branch, not merged** | Signup-only (no vendor login this pass), public directory, Account approval queue, per-event vendor log, suppliers site section. See §9. |
 
-Every milestone's commit message on `main` has the full detail of what
-shipped and how it was verified — `git log --oneline` to orient, then
-`git show <hash>` for the write-up.
+That was the last milestone in the build plan — v1 is feature-complete
+pending M8's merge.
+
+Every milestone's commit message has the full detail of what shipped and
+how it was verified — `git log --oneline` to orient (M0–M7 on `main`, M8 on
+`worktree-vendor-directory`), then `git show <hash>` for the write-up.
 
 ---
 
 ## 3. Database
 
-Eight migrations, in `supabase/migrations/`, already applied to the live
-Supabase project in order:
+Nine migrations, in `supabase/migrations/`, **all already applied to the
+live Supabase project** — including `0009`, even though the M8 code that
+depends on it is still sitting on an unmerged branch. The schema is live in
+the shared database regardless of merge status:
 
 1. `0001_init.sql` — `users`, `engagements`, `engagement_members`, RLS helpers (`is_account()`, `has_engagement()`)
 2. `0002_guests.sql` — `guests` table, RLS
@@ -168,9 +72,9 @@ Supabase project in order:
 6. `0006_day_of_hub.sql` — `schedule_items`, `announcements`
 7. `0007_fix_role_privilege_escalation.sql` — closes a critical bug, see §6
 8. `0008_checkpoints_scanning.sql` — `checkpoints`, `guest_scans`, unique `(checkpoint_id, guest_id)` index, `guest_engagement_id()` / `checkpoint_engagement_id()` helpers
+9. `0009_vendor_directory.sql` — `vendors`, `vendor_photos`, `engagement_vendors`; `vendor_is_approved()` helper; `engagement_vendors` RLS is split by operation (not one `for all`) specifically so its read policy can be broader than its write policy — see §5.
 
-**Not yet in the schema** (per the data model's own MVP-first sequencing):
-`vendors`, `vendor_photos`, `engagement_vendors`, `media` (M8/post-v1).
+**Not yet in the schema**: `media` (post-v1, deferred — see the data model doc).
 
 If you're setting this up fresh, or reviewing schema history, paste each
 file into the Supabase SQL Editor in order — they're idempotent (`if not
@@ -265,6 +169,54 @@ silently dropped, but nothing is queued for background sync either. This
 was an explicit scope call with the user, not an oversight — the build
 plan's own text offers both as valid options.
 
+**M8's vendor directory is signup-only in this pass — no vendor login.**
+The build plan's own bullet list calls for a "vendor profile editor," and
+the auth doc documents a real `global_role = 'vendor'` account with a
+login. This pass deliberately doesn't build that: a vendor submits their
+full profile once via a public form (`/directory/apply`), and Account
+manages any edits afterward (Account already has full read/write on
+`vendors`). Explicit scope call with the user — matches the PRD's own MVP
+framing ("simple listing page, manually maintained") and avoids building an
+entire authenticated portal for the build plan's lowest-priority milestone.
+`vendors.owner_user_id` stays in the schema, nullable, so a real
+self-service login is a clean addition later, not a rework.
+
+**The public vendor signup insert is the one place besides the guest-token
+path that uses the admin/service-role client from an authenticated-app
+route.** An anonymous visitor submitting `/directory/apply` has no
+session, so the ordinary RLS-aware client can't satisfy
+`vendors_write_account`'s `is_account()` check. `status` is hardcoded to
+`'pending'` server-side in that one action and never read from form
+input — the exact discipline migration `0007`'s bug was about.
+
+**`engagement_vendors`' RLS is split by operation, not one `for all`
+policy — public read, scoped write.** The auth doc's permission matrix
+says `engagement_vendors` is "credited only" for both guest-token holders
+and the public, because the wedding site's suppliers section has to render
+credited rows with no session at all. Read gets its own broader policy
+(`is_account() or has_engagement(engagement_id) or credit_on_site = true`);
+insert/update/delete stay scoped to Account or the owning engagement. Same
+asymmetric-policy pattern `sites`/`site_sections` already established in
+M5, applied to a table that needed splitting by operation rather than by
+table.
+
+**`SiteRenderer` is a pure presentational component that gained a new
+required prop, `suppliers`, rather than fetching its own data.** It's
+shared verbatim between `/s/[slug]` (public) and the site-tab preview
+(Account/couple), specifically so both surfaces render identically —
+that constraint already existed from M5 and M8 respects it rather than
+special-casing one caller.
+
+**`updateSiteSection` changed from a pure `.update()` to an `.upsert()`.**
+Every site created before M8 has no `suppliers` row in `site_sections` —
+a plain `.update()` matched on `(site_id, section_type)` would silently
+no-op the first time Account tries to save that section on an old site.
+The upsert's `sort_order` fallback values are hardcoded to exactly match
+what `createSite`'s `defaultSections` array already assigns for every
+pre-existing section type, so re-saving hero/story/the_day/rsvp/gallery/
+details is a true no-op for that column — verified live against Maria &
+Jon's site (created back in M5), not just reasoned about.
+
 ---
 
 ## 6. Security posture
@@ -279,8 +231,12 @@ still has gaps."
   permission model, RLS policy sketches, and the guest token hardening
   checklist (§5).
 - `scripts/verify-rls.mjs` — creates throwaway couple/Account users,
-  confirms couple A can't reach couple B's data (engagements, guests,
-  sites, site_sections) by list, direct id, or write. 12 checks.
+  confirms couple A can't reach couple B's data by list, direct id, or
+  write, across `engagements`, `guests`, `sites`, `site_sections`, and (as
+  of M8) `vendors`/`vendor_photos`/`engagement_vendors` — including the
+  public-read carve-outs (anon can read an approved vendor but not a
+  pending one, a credited `engagement_vendors` row but not an uncredited
+  one). 22 checks total.
 - `scripts/verify-guest-token-security.mjs` — hits the guest API directly
   over HTTP (not through the UI), confirms guest A's token reveals nothing
   about guest B, no endpoint returns a list, tampered/garbage tokens 404
@@ -296,13 +252,28 @@ npm run verify:rls
 npm run verify:guest-token
 ```
 
-**Gap: neither script covers `checkpoints`/`guest_scans` yet.** The M7 RLS
-work was verified by hand (throwaway couple sessions, live against the
-Supabase project, cleaned up after) rather than added to
-`verify-rls.mjs`'s 12 checks. Worth folding in before M8 or before real
-event data goes through the scanner.
+**Gap: neither script covers `checkpoints`/`guest_scans` yet.** Still open
+— M8 closed the equivalent gap for the new vendor tables (see above) but
+didn't retroactively add M7's tables to the suite. Worth folding in before
+real event data goes through the scanner.
 
-**Three real bugs caught and fixed, not just theoretical:**
+**M8's RLS design caught two gaps during planning, before any code
+existed** — worth noting as a contrast to M7, where the equivalent bugs
+were only caught after implementation. Both are recorded in the design
+spec's revision history
+(`docs/superpowers/specs/2026-08-02-vendor-directory-design.md`):
+1. The original `engagement_vendors` policy sketch was one `for all` rule
+   with no public-read path at all, which would have made the suppliers
+   site section unable to render for anonymous visitors — caught while
+   working out how `SiteRenderer`'s new caller would actually query the
+   data, before the migration was written.
+2. The original plan didn't specify which Supabase client the public
+   signup action should use — tracing through `vendors_write_account`'s
+   `is_account()` requirement made it clear the ordinary session client
+   would reject an anonymous insert, same failure mode migration `0007`
+   was about, caught before Task 3 was implemented rather than after.
+
+**Four real bugs caught and fixed, not just theoretical:**
 
 1. (commit `248b944`) The public site page's first version fetched
    engagement info via an embedded PostgREST join, which was itself subject
@@ -337,6 +308,20 @@ event data goes through the scanner.
    `guest_engagement_id()` and the new `checkpoint_engagement_id()` to
    match.
 
+4. (commits `ace28e7..5ccf2c9`, worktree branch) **Not a security bug —
+   a build-breaking regression, caught the same way: by actually running
+   the app rather than trusting that code compiled once.** M8's per-event
+   vendor log tab (Task 7) completed the tab-switch ternary in
+   `engagements/[id]/page.tsx` — all 7 `TABS` entries finally had explicit
+   branches — which made the old "lands in Milestone N" placeholder branch
+   genuinely unreachable. TypeScript correctly flagged it (`Property
+   'label' does not exist on type 'never'`), breaking `npm run build`
+   entirely. Not caught by Task 7's own verification (a live browser
+   walkthrough, not a full build check); caught when Task 8's own build
+   step failed on unrelated code. Fixed by replacing the dead branch with
+   `null` — every real tab already had its own branch above it, so nothing
+   about real behavior changed.
+
 ---
 
 ## 7. Known gaps / deliberate deferrals
@@ -344,9 +329,10 @@ event data goes through the scanner.
 - **Token rotation UI** — regenerating a guest's link if it leaks. Explicitly listed as "still open" in the auth doc, not attempted.
 - **Coordinator "who to ask" block** on the day-of hub only renders if an `engagement_members` row with `role = 'coordinator'` exists *and* that user's `users.phone` is filled in — there's no UI to set phone numbers yet, so this block is currently dark for both seed engagements.
 - **Footer site section** — `docs/ever-after-template-spec.md` describes one; the data model's `site_sections.section_type` check constraint doesn't include `footer`. Skipped rather than guessed at; flagged in the M5 commit.
-- **`suppliers` section type** exists in the schema's check constraint but has no editor UI yet — it depends on `engagement_vendors`, which doesn't exist until M8.
 - **No profile-editing UI** — see the "Bruce" note in §4.
 - **No automated RLS regression test for `checkpoints`/`guest_scans`** — see the gap note in §6.
+- **No vendor self-service login or editor** — deliberate M8 scope decision, see §5. Adding it later is additive (the schema already has `vendors.owner_user_id`), not a rework.
+- **A handful of Minor-severity findings from M8's task reviews were deliberately deferred**, not fixed — non-numeric `rate_from`/`rate_to` silently becomes `null` instead of erroring; the per-event vendor log's off-platform `business_name` field isn't marked required; notes typed on a directory-linked vendor-log entry are silently discarded (only the off-platform path stores them); `/directory`'s card grid has no responsive breakpoints. None are security- or data-integrity-relevant. Full detail with file:line references in `.superpowers/sdd/2026-08-02-vendor-directory/progress.md` (worktree-local, not committed — see §9).
 
 ---
 
@@ -363,3 +349,48 @@ npm run verify:guest-token   # needs the dev server running
 `node --env-file=.env.local scripts/create-account-user.mjs <email> <password> "<name>"`
 creates a new Account (internal team) login directly via the Supabase
 admin API — there's no public signup path for that role, by design.
+
+---
+
+## 9. Merging Milestone 8
+
+**Branch:** `worktree-vendor-directory`, in a git worktree at
+`.claude/worktrees/vendor-directory` off this repo. 10 commits ahead of
+`main` (9 plan-task commits + this handoff rewrite), all local — nothing
+pushed to `origin` yet. `git log --oneline main..HEAD` from the worktree
+to see the exact list; each commit message carries its own detail, same as
+every prior milestone.
+
+**How this milestone was built**, for context on the commit history's
+shape: `superpowers:brainstorming` → `superpowers:writing-plans` →
+`superpowers:subagent-driven-development` for Tasks 1–7 (fresh implementer
+subagent + independent reviewer subagent per task, fix-loop on
+Important/Critical findings), then a direct switch back to the same
+plan-mode workflow M7 used (the user asked to stop using the
+`superpowers` plugin's per-task subagent dispatch partway through Task 8 —
+it had also been uninstalled from this environment mid-session, so this
+was as much a practical necessity as a preference). Tasks 8 and 9 were
+reviewed and verified directly, not via dispatched reviewer subagents.
+Both approaches produced the same rigor — real diffs read line-by-line,
+real live browser verification, nothing taken on the strength of a
+report alone — just via different mechanics. The design spec
+(`docs/superpowers/specs/2026-08-02-vendor-directory-design.md`) and plan
+(`docs/superpowers/plans/2026-08-02-vendor-directory.md`) are both
+committed to this branch and worth keeping even after merge — they're the
+record of *why*, same role this handoff plays for the rest of the app.
+
+**The progress ledger is not committed** —
+`.superpowers/sdd/2026-08-02-vendor-directory/progress.md` is gitignored,
+worktree-local scratch. It has the full task-by-task history (every fix
+round, every finding, every review verdict) that fed into this handoff's
+summaries. If you want that detail preserved past the worktree's lifetime,
+copy it out before removing the worktree — it won't survive
+`git worktree remove` / `ExitWorktree` with `action: "remove"`.
+
+**Before merging:** the user hasn't been asked how they want this done —
+a straight `git merge` into `main`, or opened as a PR first (this repo has
+no GitHub remote branch for this work yet, so a PR would need a push
+first). Ask rather than assume. After merging, the usual production
+deploy is automatic (Vercel auto-deploys `main`) — no separate deploy step,
+but worth a quick check that the build succeeds on Vercel the way it does
+locally, same as every prior milestone's push.
