@@ -7,6 +7,7 @@ import SiteTab from "./site/site-tab";
 import DayOfTab from "./day-of/day-of-tab";
 import CheckpointsTab from "./checkpoints/checkpoints-tab";
 import VendorsTab from "./vendors/vendors-tab";
+import PeopleTab from "./people/people-tab";
 
 const TABS = [
   { key: "overview", label: "Overview" },
@@ -16,6 +17,7 @@ const TABS = [
   { key: "day-of", label: "Day-of Hub", milestone: 6 },
   { key: "checkpoints", label: "Checkpoints", milestone: 7 },
   { key: "vendors", label: "Vendors", milestone: 8 },
+  { key: "people", label: "People" },
 ] as const;
 
 const STAGE_LABELS: Record<string, string> = {
@@ -157,6 +159,8 @@ export default async function EngagementWorkspacePage({
         <CheckpointsTab engagementId={id} />
       ) : activeTab.key === "vendors" ? (
         <VendorsTab engagementId={id} error={error} />
+      ) : activeTab.key === "people" ? (
+        <PeopleTab engagementId={id} error={error} />
       ) : null}
     </div>
   );

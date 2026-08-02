@@ -40,11 +40,14 @@ export async function updateSession(request: NextRequest) {
   // /s/[slug] is the public wedding site: anonymous visitors see
   // published sites (RLS-gated), while a logged-in Account/couple
   // still gets their session cookies here to preview a draft.
+  // /invite/ is anonymous invite acceptance — the token is the
+  // credential, not a session, same as /r/.
   const isPublicRoute =
     request.nextUrl.pathname.startsWith("/r/") ||
     request.nextUrl.pathname.startsWith("/api/g/") ||
     request.nextUrl.pathname.startsWith("/s/") ||
-    request.nextUrl.pathname.startsWith("/directory");
+    request.nextUrl.pathname.startsWith("/directory") ||
+    request.nextUrl.pathname.startsWith("/invite/");
 
   if (isPublicRoute) {
     return supabaseResponse;

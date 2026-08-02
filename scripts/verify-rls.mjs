@@ -703,6 +703,210 @@ try {
   await admin.auth.admin.deleteUser(couple3UserId);
 }
 
+// Member invites (launch-readiness spec Part 1): engagement_invites
+// isolation. Only Account can create an invite; a couple/coordinator can
+// read invites for their own engagement (so they can see who else has
+// access) but not create one, and cannot read another engagement's
+// invites at all.
+// invited_by only needs to reference *some* users row (no role
+// requirement) — testUserId from the very first section was already
+// deleted by that section's own cleanup, so this section creates and
+// owns its own short-lived fixture user for the FK instead.
+const inviterEmail = `rls-test-inviter-${Date.now()}@example.com`;
+const { data: inviterCreated, error: inviterCreateError } = await admin.auth.admin.createUser({
+  email: inviterEmail,
+  password: "verify-rls-temp-password-1234",
+  email_confirm: true,
+  user_metadata: { full_name: "RLS Test Inviter" },
+});
+if (inviterCreateError) {
+  console.error("Failed to create inviter fixture user:", inviterCreateError.message);
+  process.exit(1);
+}
+const inviterUserId = inviterCreated.user.id;
+
+const { data: mariaJonInvite, error: mariaJonInviteError } = await admin
+  .from("engagement_invites")
+  .insert({
+    engagement_id: mariaJon.id,
+    email: "rls-test-invite-mj@example.com",
+    role: "coordinator",
+    invited_by: inviterUserId,
+  })
+  .select("id")
+  .single();
+if (mariaJonInviteError) {
+  console.error("Failed to create Maria & Jon invite fixture:", mariaJonInviteError.message);
+  process.exit(1);
+}
+const { data: erickErikaInvite, error: erickErikaInviteError } = await admin
+  .from("engagement_invites")
+  .insert({
+    engagement_id: erickErika.id,
+    email: "rls-test-invite-ee@example.com",
+    role: "coordinator",
+    invited_by: inviterUserId,
+  })
+  .select("id")
+  .single();
+if (erickErikaInviteError) {
+  console.error("Failed to create Erick & Erika invite fixture:", erickErikaInviteError.message);
+  process.exit(1);
+}
+
+const couple4Email = `rls-test-couple4-${Date.now()}@example.com`;
+const couple4Password = "verify-rls-temp-password-1234";
+const { data: created4, error: create4Error } = await admin.auth.admin.createUser({
+  email: couple4Email,
+  password: couple4Password,
+  email_confirm: true,
+  user_metadata: { full_name: "RLS Test Couple 4" },
+});
+if (create4Error) {
+  console.error("Failed to create fourth test couple:", create4Error.message);
+  process.exit(1);
+}
+const couple4UserId = created4.user.id;
+await admin.from("engagement_members").insert({
+  engagement_id: mariaJon.id,
+  user_id: couple4UserId,
+  role: "coordinator",
+});
+
+try {
+  const asCouple4 = createClient(url, anonKey);
+  const { error: signIn4Error } = await asCouple4.auth.signInWithPassword({
+    email: couple4Email,
+    password: couple4Password,
+  });
+  if (signIn4Error) {
+    console.error("Failed to sign in as fourth test couple:", signIn4Error.message);
+    process.exit(1);
+  }
+
+  const { data: visibleInvites } = await asCouple4
+    .from("engagement_invites")
+    .select("id, engagement_id");
+  const visibleInviteIds = new Set(visibleInvites?.map((i) => i.id));
+  check(
+    "couple's invite list is scoped to their own engagement",
+    visibleInvites?.every((i) => i.engagement_id === mariaJon.id) &&
+      visibleInviteIds.has(mariaJonInvite.id) &&
+      !visibleInviteIds.has(erickErikaInvite.id),
+  );
+
+  const { data: otherInviteFetch } = await asCouple4
+    .from("engagement_invites")
+    .select("id")
+    .eq("id", erickErikaInvite.id)
+    .maybeSingle();
+  check(
+    "couple cannot fetch the other engagement's invite by id",
+    otherInviteFetch === null,
+  );
+
+  const { error: coupleInviteInsertError } = await asCouple4
+    .from("engagement_invites")
+    .insert({
+      engagement_id: mariaJon.id,
+      email: "should-not-be-allowed@example.com",
+      role: "coordinator",
+      invited_by: couple4UserId,
+    });
+  check(
+    "couple (non-Account) cannot create an invite, even for their own engagement",
+    coupleInviteInsertError !== null,
+  );
+} finally {
+  await admin.from("engagement_members").delete().eq("user_id", couple4UserId);
+  await admin.auth.admin.deleteUser(couple4UserId);
+}
+
+// getInviteByToken's own "no distinguishing oracle" property — revoked
+// and expired invites must be indistinguishable from not-found, same as
+// the guest-token path.
+const { data: revokedInviteFixture, error: revokedInviteError } = await admin
+  .from("engagement_invites")
+  .insert({
+    engagement_id: mariaJon.id,
+    email: "rls-test-invite-revoked@example.com",
+    role: "partner",
+    invited_by: inviterUserId,
+    revoked_at: new Date().toISOString(),
+  })
+  .select("token")
+  .single();
+if (revokedInviteError) {
+  console.error("Failed to create revoked invite fixture:", revokedInviteError.message);
+  process.exit(1);
+}
+const { data: expiredInviteFixture, error: expiredInviteError } = await admin
+  .from("engagement_invites")
+  .insert({
+    engagement_id: mariaJon.id,
+    email: "rls-test-invite-expired@example.com",
+    role: "partner",
+    invited_by: inviterUserId,
+    expires_at: new Date(Date.now() - 60_000).toISOString(),
+  })
+  .select("token")
+  .single();
+if (expiredInviteError) {
+  console.error("Failed to create expired invite fixture:", expiredInviteError.message);
+  process.exit(1);
+}
+
+// src/lib/invite-token.ts is TypeScript and this script runs under plain
+// `node`, so its validity rules (accepted_at/revoked_at/expires_at) are
+// re-checked directly here against the fixture rows rather than importing
+// the module — same properties src/lib/invite-token.ts's getInviteByToken
+// is required to uphold, verified independently.
+function isUsableInvite(row) {
+  if (!row) return false;
+  if (row.accepted_at || row.revoked_at) return false;
+  if (new Date(row.expires_at) < new Date()) return false;
+  return true;
+}
+const { data: revokedInviteRow } = await admin
+  .from("engagement_invites")
+  .select("accepted_at, revoked_at, expires_at")
+  .eq("token", revokedInviteFixture.token)
+  .maybeSingle();
+check(
+  "a revoked invite is not usable (mirrors getInviteByToken's null case)",
+  !isUsableInvite(revokedInviteRow),
+);
+const { data: expiredInviteRow } = await admin
+  .from("engagement_invites")
+  .select("accepted_at, revoked_at, expires_at")
+  .eq("token", expiredInviteFixture.token)
+  .maybeSingle();
+check(
+  "an expired invite is not usable (mirrors getInviteByToken's null case)",
+  !isUsableInvite(expiredInviteRow),
+);
+const { data: garbageTokenRow } = await admin
+  .from("engagement_invites")
+  .select("accepted_at, revoked_at, expires_at")
+  .eq("token", "not-a-real-token-at-all")
+  .maybeSingle();
+check(
+  "a garbage token matches no invite row",
+  garbageTokenRow === null,
+);
+
+await admin.from("engagement_invites").delete().eq("id", mariaJonInvite.id);
+await admin.from("engagement_invites").delete().eq("id", erickErikaInvite.id);
+await admin
+  .from("engagement_invites")
+  .delete()
+  .eq("email", "rls-test-invite-revoked@example.com");
+await admin
+  .from("engagement_invites")
+  .delete()
+  .eq("email", "rls-test-invite-expired@example.com");
+await admin.auth.admin.deleteUser(inviterUserId);
+
 const secondAccountEmail = `rls-test-account-${Date.now()}@example.com`;
 const secondAccountPassword = "verify-rls-temp-password-1234";
 
@@ -772,6 +976,24 @@ try {
     "a second Account user sees checkpoints across every engagement",
     checkpointIds.has(accountCheckpointMJ.id) && checkpointIds.has(accountCheckpointEE.id),
   );
+
+  const { data: accountInvite, error: accountInviteError } = await asSecondAccount
+    .from("engagement_invites")
+    .insert({
+      engagement_id: erickErika.id,
+      email: "rls-test-invite-account.mjs@example.com",
+      role: "partner",
+      invited_by: secondAccount.user.id,
+    })
+    .select("id")
+    .single();
+  check(
+    "a second Account user can create an invite for any engagement",
+    !accountInviteError && !!accountInvite,
+  );
+  if (accountInvite) {
+    await admin.from("engagement_invites").delete().eq("id", accountInvite.id);
+  }
 } finally {
   await admin.from("checkpoints").delete().eq("id", accountCheckpointMJ.id);
   await admin.from("checkpoints").delete().eq("id", accountCheckpointEE.id);
