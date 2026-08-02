@@ -157,13 +157,7 @@ export default async function EngagementWorkspacePage({
         <CheckpointsTab engagementId={id} />
       ) : activeTab.key === "vendors" ? (
         <VendorsTab engagementId={id} />
-      ) : (
-        <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center">
-          <p className="text-sm text-neutral-500">
-            {activeTab.label} lands in Milestone {activeTab.milestone}.
-          </p>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }
