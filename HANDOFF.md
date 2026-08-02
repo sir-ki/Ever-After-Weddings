@@ -4,9 +4,11 @@ Status snapshot as of Milestone 8. Written for whoever picks this up next —
 a contractor scoping post-v1 work, a future session of this same project,
 or the founder coming back after a break.
 
-Companion to `docs/ever-after-build-plan.md`, which this follows milestone by
-milestone. Read that first for *why* the work is sequenced this way; this
-doc is *where things currently stand*.
+Companion to `docs/ever-after-build-plan.md` (M0–M8, followed milestone by
+milestone) and, for everything after v1, `docs/ever-after-launch-readiness-
+spec.md` (Parts 1–7). Read whichever plan doc covers the era you're
+touching first for *why* the work is sequenced that way; this doc is
+*where things currently stand*.
 
 **v1 is feature-complete.** All 8 milestones are merged into `main`, pushed,
 and deployed to production. §9 has the detail on how M8 was built, for
@@ -15,11 +17,16 @@ context on that milestone's commit history.
 **2026-08-02, post-M8: a short hardening pass closed the punch list of
 fixable-now gaps** — RLS coverage for `checkpoints`/`guest_scans`,
 self-service profile editing (and the "Bruce" placeholder fix), and all
-four of M8's deferred minor findings. See §6 and §7 for detail. What's
-left in §7 are real features (invite flow, token rotation, etc.), not
-quick fixes — each needs its own scoping pass, not a punch-list treatment.
-§10 covers the workflow this pass used, since it's a deliberate change
-from how M0–M8 were built.
+four of M8's deferred minor findings. See §6 and §7 for detail. §10 covers
+the workflow this pass used, since it's a deliberate change from how
+M0–M8 were built.
+
+**2026-08-02, launch readiness (post-hardening): Parts 1, 2, 3, and 5 of
+`docs/ever-after-launch-readiness-spec.md` are done, verified, and
+pushed.** Parts 4 (guest-facing UI/UX pass), 6 (entourage & processional),
+and 7 (printables & exports) are still open. §11 is the full writeup —
+read it before touching the invite flow, guest tokens, or invitation
+cards, and before picking the next part.
 
 ---
 
@@ -79,6 +86,7 @@ Supabase project in order:
 9. `0009_vendor_directory.sql` — `vendors`, `vendor_photos`, `engagement_vendors`; `vendor_is_approved()` helper; `engagement_vendors` RLS is split by operation (not one `for all`) specifically so its read policy can be broader than its write policy — see §5.
 10. `0010_users_self_update.sql` — self-service profile editing: `users_update_self` RLS policy plus `lock_self_update_sensitive_columns` trigger to keep `global_role`/`email`/`archived_at` Account-only — see §5.
 11. `0011_fix_users_self_update_trigger.sql` — fixes `0010`'s trigger, which also blocked legitimate service-role writes — see the bug writeup in §6.
+12. `0012_member_invites.sql` — `engagement_invites` (launch-readiness Part 1): single-use, expiring invite tokens; RLS is Account read/write, engagement-members read-only. Corrected in place after initial verification found the token's original base64 encoding could contain `/`, breaking the `/invite/[token]` route — now base64url, matching `guests.invite_token`'s existing scheme. See §11.
 
 **Not yet in the schema**: `media` (post-v1, deferred — see the data model doc).
 
@@ -102,9 +110,16 @@ day one" rule — every feature gets built and tested against both:
   Harmless to leave or delete.
 - **Erick & Erika** (`5e95d26a-f8b7-4ef0-b215-0cfb161a95c6`) — deliberately
   left sparse, to exercise empty states.
+- **Carlos & Diana** (added 2026-08-02, launch-readiness Part 5) — ~300
+  guests across 15 `guest_group` clusters, 30 tables (capacity 10), and a
+  `guest_cap` of 280 (deliberately below the seeded guest count, so the
+  new advisory over-cap banner is visible out of the box). Exists purely
+  to stress-test the guest list, seating, and bulk QR export at real
+  mid-tier-wedding scale — the two engagements above stay exactly as they
+  were, untouched by this addition.
 
-Re-seed with `npm run seed` (adds the two engagements if missing; skips if
-they already exist).
+Re-seed with `npm run seed` (idempotent — skips any engagement that
+already exists by `display_name`; only ever adds).
 
 **The one Account login**: `brulkeanjames@gmail.com`, password shared
 earlier in an unlogged session. `full_name` is now "Account Admin" (was
@@ -249,27 +264,42 @@ still has gaps."
 - `scripts/verify-rls.mjs` — creates throwaway couple/Account users,
   confirms couple A can't reach couple B's data by list, direct id, or
   write, across `engagements`, `guests`, `sites`, `site_sections`,
-  `vendors`/`vendor_photos`/`engagement_vendors` (as of M8) — including the
+  `vendors`/`vendor_photos`/`engagement_vendors` (as of M8), `checkpoints`/
+  `guest_scans` (added 2026-08-02 hardening pass), and, as of the
+  launch-readiness pass, `engagement_invites` — including the
   public-read carve-outs (anon can read an approved vendor but not a
   pending one, a credited `engagement_vendors` row but not an uncredited
-  one) — and, as of 2026-08-02, `checkpoints`/`guest_scans`. That last
-  addition specifically exercises the cross-engagement guard fixed in
-  migration `0008`/commit `9652156` (a coordinator's own guest can't be
-  scanned against a checkpoint from a different engagement) — the one real
-  gap this suite had. 30 checks total.
+  one) and the "no distinguishing oracle" property for revoked/expired
+  invites. **39 checks total.**
 - `scripts/verify-guest-token-security.mjs` — hits the guest API directly
   over HTTP (not through the UI), confirms guest A's token reveals nothing
   about guest B, no endpoint returns a list, tampered/garbage tokens 404
-  identically, writes are blocked past the RSVP deadline, and the rate
-  limiter actually trips. 15 checks. Needs the app running — set
-  `BASE_URL` to point at a deployed URL, or just run against local dev.
+  identically, writes are blocked past the RSVP deadline, the rate
+  limiter actually trips, and — added for Part 2 (token rotation) —
+  rotating mid-run kills the old token immediately and the new one
+  resolves with RSVP/table data intact. **18 checks.** Needs the app
+  running — set `BASE_URL` to point at a deployed URL, or just run
+  against local dev.
+- `scripts/verify-invitation-card.mjs` — Part 3: proves the QR embedded in
+  a generated invitation card actually decodes via `jsqr` (the same
+  library the M7 scanner uses), and that the decoded payload parses back
+  to the guest's real token through the scanner's own `extractToken()`
+  logic. **4 checks.**
+- `scripts/verify-rate-limit-scale.mjs` / `scripts/verify-scanner-throughput.mjs` —
+  Part 5: confirm the rate limiter is genuinely per-IP (300 distinct
+  simulated guest IPs never trip each other) and that 300 simulated
+  sequential checkpoint scans complete with no errors/degradation.
 
-Run both after any change touching RLS policies, guest endpoints, or
-`src/lib/guest-token.ts` / `src/lib/rate-limit.ts` / `src/lib/supabase/admin.ts`:
+Run all of these after any change touching RLS policies, guest endpoints,
+invites, or `src/lib/guest-token.ts` / `src/lib/rate-limit.ts` /
+`src/lib/supabase/admin.ts` / `src/lib/invite-token.ts`:
 
 ```bash
 npm run verify:rls
 npm run verify:guest-token
+npm run verify:invitation-card
+npm run verify:rate-limit-scale
+npm run verify:scanner-throughput
 ```
 
 **M8's RLS design caught two gaps during planning, before any code
@@ -357,16 +387,26 @@ spec's revision history
 ## 7. Known gaps / deliberate deferrals
 
 Everything that was fixable as a self-contained punch-list item was closed
-2026-08-02 (see §6's bug #5 and the "fixed" note below). What's left below
-is real feature scope — each one needs its own design/plan pass before
-implementation, not a quick patch.
+2026-08-02 (see §6's bug #5 and the "fixed" note below). The member-invite
+flow and token rotation gaps listed here previously are **closed** — see
+§11. What's left below is real feature scope — each one needs its own
+design/plan pass before implementation, not a quick patch.
 
-- **Token rotation UI** — regenerating a guest's link if it leaks. Explicitly listed as "still open" in the auth doc, not attempted. The only remaining item with real security relevance (a leaked link currently can't be revoked) — recommended next if picking one.
-- **No member-invite flow** — bigger than it first looks. The auth doc says couples/coordinators are "invited by Account, creating an `engagement_members` row at the same time" (`docs/ever-after-auth-and-access.md:227`), but no UI implements this anywhere, not even for couples — the two seed engagements' members were created directly via `scripts/seed.mjs`/SQL, not through the app. This blocks the item below.
-- **Coordinator "who to ask" block** on the day-of hub only renders if an `engagement_members` row with `role = 'coordinator'` exists *and* that user's `users.phone` is filled in. `/profile` (added 2026-08-02) now lets any signed-in user set their own phone, so the phone-number half of this gap is closed — but there's still no way to get a coordinator attached to an engagement in the first place (see the member-invite gap above), so this block stays dark for both seed engagements.
-- **Footer site section** — `docs/ever-after-template-spec.md` describes one; the data model's `site_sections.section_type` check constraint doesn't include `footer`. Skipped rather than guessed at; flagged in the M5 commit.
+- **Guest-facing UI/UX pass (launch-readiness Part 4)** — not started.
+  Deliberately last in the launch-readiness order, so every surface built
+  by Parts 1–3/5/6 gets styled in one sweep instead of piecemeal.
+- **Entourage & processional (launch-readiness Part 5, doc's own Part 6)** —
+  not started. The most visible Filipino-wedding gap per the launch
+  spec; can run independently of the other parts.
+- **Printables & exports (launch-readiness Part 7)** — not started.
+  Sequenced after entourage (so the processional printable exists) and
+  after invitation cards (Part 3, done) since it reuses that rendering
+  pipeline.
+- **Coordinator "who to ask" block** on the day-of hub only renders if an `engagement_members` row with `role = 'coordinator'` exists *and* that user's `users.phone` is filled in. `/profile` (added 2026-08-02) lets any signed-in user set their own phone, and the member-invite flow (§11) now provides a real way to attach a coordinator — this block should light up for any engagement with an invited, phone-having coordinator; still dark for the two original seed engagements since their members were only ever added via SQL.
+- **Footer site section** — `docs/ever-after-template-spec.md` describes one; the data model's `site_sections.section_type` check constraint doesn't include `footer`. Skipped rather than guessed at; flagged in the M5 commit. The launch-readiness spec's entourage part (Part 6) folds adding `footer` into the same migration as `entourage`, so this closes naturally whenever that part gets built.
 - **No vendor self-service login or editor** — deliberate M8 scope decision, see §5. Adding it later is additive (the schema already has `vendors.owner_user_id`), not a rework.
 - ~~A handful of Minor-severity findings from M8's task reviews were deliberately deferred~~ — **fixed 2026-08-02**: non-numeric `rate_from`/`rate_to` now redirects with an error instead of silently becoming `null` (`src/lib/parse-rate.ts`, used by both `directory/apply/actions.ts` and `(app)/vendors/actions.ts`); the per-event vendor log's off-platform `business_name` is now required server-side (`(app)/engagements/[id]/vendors/actions.ts`); notes on a directory-linked vendor-log entry are no longer discarded (both insert branches now pass `notes` through); `/directory`'s card grid is now `grid-cols-1 sm:grid-cols-2`. Fixing the required-field/rate validation surfaced a small pre-existing gap in the same code — action success paths only called `revalidatePath`, never `redirect`, so a prior error left in the URL's `?error=` param would stick around after a subsequent successful submit; both `addEngagementVendor` and `updateVendor` now redirect on success too.
+- **Physical print + camera scan test still owed** (Part 3's own done-when). QR decode correctness is proven by script (`verify-invitation-card.mjs`, using the scanner's actual `jsqr`/`extractToken()` logic), but no environment used for this project so far has had a printer or camera — a real print-and-scan against the live M7 scanner is still worth doing once someone has both.
 
 ---
 
@@ -375,14 +415,35 @@ implementation, not a quick patch.
 ```bash
 npm install
 npm run dev          # http://localhost:3000
-npm run seed          # idempotent, adds the two fake engagements if missing
+npm run seed          # idempotent, adds the three fake engagements if missing
 npm run verify:rls
-npm run verify:guest-token   # needs the dev server running
+npm run verify:guest-token       # needs the dev server running
+npm run verify:invitation-card
+npm run verify:rate-limit-scale
+npm run verify:scanner-throughput
 ```
 
 `node --env-file=.env.local scripts/create-account-user.mjs <email> <password> "<name>"`
 creates a new Account (internal team) login directly via the Supabase
 admin API — there's no public signup path for that role, by design.
+
+**`NEXT_PUBLIC_SITE_URL`** (added 2026-08-02, launch-readiness Part 1) —
+used to build absolute copyable links (invite links, invitation-card QR
+payloads). Set to `http://localhost:3000` in local `.env.local`; **must
+also be set in the Vercel project's environment variables**
+(`https://ever-after-weddings-seven.vercel.app`) or copy-link/QR features
+will point at localhost in production. Not yet confirmed set there as of
+this writing — check before relying on either feature live.
+
+**Testing as Account/couple in this environment**: there's no saved
+password for the one real Account login
+(`brulkeanjames@gmail.com` — see §4) in this session's memory, so
+walkthroughs this pass used disposable throwaway Account/couple users
+created via the admin client (same pattern `verify-rls.mjs` already uses),
+signed in through the browser, and deleted again afterward. Nothing
+persists from these; if you hit an "already exists" error on an email
+like `walkthrough-account-temp*@example.com`, it's leftover from an
+interrupted session — safe to delete via `admin.auth.admin.deleteUser`.
 
 ---
 
@@ -464,3 +525,111 @@ the going-forward default:
   caught two real bugs this way (§6 bug #5, and a stale-error-banner UX
   issue in the M8 minor-findings fix) that would have shipped unnoticed
   without live verification.
+
+---
+
+## 11. Launch-readiness spec — Parts 1, 2, 3, 5 (2026-08-02)
+
+`docs/ever-after-launch-readiness-spec.md` scopes the work between
+"v1 feature-complete" and "can take a real client," in seven parts. Parts
+1, 2, 3, and 5 are done, following exactly the workflow §10 describes
+(plan mode → explicit sign-off → implement → verify live → commit). Three
+commits on `main`: `8c59ffc` (Part 1), `7477a20` (Part 2), `f015d7a`
+(Part 3), `da3de60` (Part 5).
+
+### Part 1 — Member invite flow
+
+The hard blocker the spec called out: there was no way to attach a couple
+or coordinator to an engagement except SQL. Now: a **People tab** lets
+Account generate a single-use, 14-day-expiring invite link
+(`engagement_invites`, migration `0012`); the invitee accepts at
+`/invite/[token]` (public route, admin-client lookup, same discipline as
+guest tokens), sets their own password, and is attached via the invite
+row's own `engagement_id`/`role` — never client-supplied, matching the
+migration-`0007` discipline. New: `src/lib/invite-token.ts`,
+`src/app/invite/[token]/*`, `src/app/(app)/engagements/[id]/people/*`.
+
+**Real bug caught during verification, not just planning**: the token's
+initial encoding was plain base64, which can contain `/` — a `/` inside
+`/invite/[token]` gets parsed as a second URL path segment, breaking the
+route. Caught by actually generating a link and opening it, not by reading
+the code. Fixed by switching to the same base64url scheme
+`guests.invite_token` already used (`0012` corrected in place, re-run).
+
+### Part 2 — Token rotation
+
+The auth doc's own "still open" item, and the last gap with real security
+relevance: a leaked guest link couldn't be revoked. Added single-guest and
+bulk "regenerate link" actions (`src/app/(app)/engagements/[id]/guests/
+[guestId]/rotate/`, `.../rotate-all/`), each behind a confirmation page —
+reusing the tables/assign preview-then-confirm idiom already in this
+codebase (there is no `window.confirm()`/modal anywhere here) rather than
+inventing a new one. Tokens are generated in app code
+(`crypto.randomBytes(16).toString("base64url")`, matching the DB column
+default's shape exactly) and written through the ordinary RLS-scoped
+client — **no new migration**.
+
+### Part 3 — Guest invitation QR delivery
+
+Nothing previously *produced* a QR for a guest to receive, even though
+the M7 scanner could decode one. Added a per-guest downloadable invitation
+card (PNG: couple names, date, venue, guest name, QR encoding
+`/r/[token]`) and a bulk zip for the whole guest list, plus a lighter
+"Copy link" action. New dependencies: `qrcode` (encoding — `jsqr` stays
+decode-only), `jszip` (bulk zip), and Next's built-in `next/og`
+`ImageResponse` for card compositing (no new dependency). Two bundled OFL
+fonts (`src/assets/fonts/PTSerif-Regular.ttf`, `PTSans-Regular.ttf`) since
+server-side image rendering needs real font binaries, not CSS — picked as
+a placeholder pairing, not a final design decision (Part 4 owns real
+per-couple typography).
+
+**Verified by decoding, not inspection**: `scripts/verify-invitation-card.mjs`
+actually renders a card and decodes its QR with `jsqr` — proving the
+payload round-trips through the scanner's own `extractToken()` logic.
+**Still owed**: an actual physical print + phone-camera scan against the
+live M7 scanner — no printer/camera has been available in any environment
+used for this project so far.
+
+Card design (colors, one serif/one sans) follows Part 4's own default
+token values, hardcoded — `sites.theme` is still an untyped `jsonb` stub
+with no read/write anywhere in the codebase, so there's no per-couple
+theme convention to hook into yet.
+
+### Part 5 — Open guest cap
+
+`guest_cap` (defaulted to 50, never editable anywhere) now has an inline
+Account-only edit form on the Overview tab
+(`src/app/(app)/engagements/[id]/actions.ts`), and is purely **advisory**
+— the guest list shows an amber over-cap banner, nothing is ever blocked,
+same discipline `tables.capacity`'s existing badge already followed.
+
+Also: the first pagination this app has ever had
+(`guests/guest-list-tab.tsx`, `.range()`-based, 50/page) — nothing
+anywhere paginated before this. And a third seeded engagement, **Carlos &
+Diana** (~300 guests, 30 tables, 15 groups — see §4), specifically to
+stress-test Parts 2/3/5 against a real mid-tier-wedding scale instead of
+the dozen-or-so guests every other feature was built and tested against.
+
+**The scale risk Part 3 explicitly deferred** ("decide before building
+Part 3, not after it fails") now has a real answer: bulk zip rendering is
+batched (concurrency 8) with an explicit `maxDuration = 60`, and measured
+live at **13.8 seconds for 300 cards** — comfortable margin under the
+60s Vercel Hobby-plan ceiling. The rate limiter was confirmed genuinely
+per-IP (not a global counter) via `verify-rate-limit-scale.mjs`, and
+scanner throughput was confirmed steady (223ms/scan average, dominated by
+network latency to Supabase, not degradation) via
+`verify-scanner-throughput.mjs` across 300 simulated sequential arrivals.
+
+### A testing-environment quirk worth knowing about
+
+In the sandboxed preview browser used for these verification passes,
+plain synthetic clicks (`computer` tool) on server-action submit buttons
+frequently didn't dispatch a request at all — no error, just silent
+no-ops, repeatedly, across multiple unrelated forms (login, guest-cap
+save, bulk-assign confirm). Forcing the same button via
+`element.click()` / `form.requestSubmit()` through `javascript_tool`
+always worked correctly. Not a product bug — every action fired correctly
+and produced the right server-side result once actually triggered — but
+worth trying that fallback immediately if a form seems to do nothing
+during a future live walkthrough, rather than assuming the feature is
+broken.
