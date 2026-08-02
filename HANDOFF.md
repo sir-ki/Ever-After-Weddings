@@ -8,11 +8,9 @@ Companion to `docs/ever-after-build-plan.md`, which this follows milestone by
 milestone. Read that first for *why* the work is sequenced this way; this
 doc is *where things currently stand*.
 
-**⚠️ M8 is code-complete and verified, but lives on branch
-`worktree-vendor-directory` (a git worktree at
-`.claude/worktrees/vendor-directory`), not yet merged into `main` or pushed
-to origin.** `main` on GitHub still shows M7 as the latest milestone. See
-§9 for exactly what's on this branch and what merging it involves.
+**v1 is feature-complete.** All 8 milestones are merged into `main`, pushed,
+and deployed to production. §9 has the detail on how M8 was built, for
+context on that milestone's commit history.
 
 ---
 
@@ -46,23 +44,20 @@ handlers. Never import that admin client from anything client-side.
 | 5 — The wedding site | ✅ Done | One template, draft/publish, `/s/[slug]` |
 | 6 — Day-of hub | ✅ Done | `/r/[token]/day`, announcements, run of show |
 | 7 — Checkpoints & scanning | ✅ Done | Checkpoint CRUD, QR + manual scanner, live derived counts — see §6 for a real RLS bug caught while building this |
-| 8 — Vendor directory | ✅ Done, **on branch, not merged** | Signup-only (no vendor login this pass), public directory, Account approval queue, per-event vendor log, suppliers site section. See §9. |
+| 8 — Vendor directory | ✅ Done | Signup-only (no vendor login this pass), public directory, Account approval queue, per-event vendor log, suppliers site section. See §9 for how it was built. |
 
-That was the last milestone in the build plan — v1 is feature-complete
-pending M8's merge.
+That was the last milestone in the build plan — v1 is feature-complete.
 
 Every milestone's commit message has the full detail of what shipped and
-how it was verified — `git log --oneline` to orient (M0–M7 on `main`, M8 on
-`worktree-vendor-directory`), then `git show <hash>` for the write-up.
+how it was verified — `git log --oneline` to orient, then `git show <hash>`
+for the write-up.
 
 ---
 
 ## 3. Database
 
-Nine migrations, in `supabase/migrations/`, **all already applied to the
-live Supabase project** — including `0009`, even though the M8 code that
-depends on it is still sitting on an unmerged branch. The schema is live in
-the shared database regardless of merge status:
+Nine migrations, in `supabase/migrations/`, all applied to the live
+Supabase project in order:
 
 1. `0001_init.sql` — `users`, `engagements`, `engagement_members`, RLS helpers (`is_account()`, `has_engagement()`)
 2. `0002_guests.sql` — `guests` table, RLS
@@ -352,40 +347,44 @@ admin API — there's no public signup path for that role, by design.
 
 ---
 
-## 9. Merging Milestone 8
+## 9. How Milestone 8 was built
 
-**Branch:** `worktree-vendor-directory`, in a git worktree at
-`.claude/worktrees/vendor-directory` off this repo. 10 commits ahead of
-`main` (9 plan-task commits + this handoff rewrite), all local — nothing
-pushed to `origin` yet. `git log --oneline main..HEAD` from the worktree
-to see the exact list; each commit message carries its own detail, same as
-every prior milestone.
+Built in an isolated git worktree (branch `worktree-vendor-directory`),
+merged into `main` as a fast-forward once done (`3c9de03..a478b17` —
+`git log --oneline 9652156..a478b17` from `main` shows the full M8 range,
+including the design-spec and plan commits that preceded implementation),
+pushed, and deployed. The worktree itself has since been removed — it was
+fully merged first, so nothing was lost; `git worktree list` now shows only
+the main checkout.
 
-**How this milestone was built**, for context on the commit history's
-shape: `superpowers:brainstorming` → `superpowers:writing-plans` →
+**Process:** `superpowers:brainstorming` → `superpowers:writing-plans` →
 `superpowers:subagent-driven-development` for Tasks 1–7 (fresh implementer
 subagent + independent reviewer subagent per task, fix-loop on
 Important/Critical findings), then a direct switch back to the same
-plan-mode workflow M7 used (the user asked to stop using the
-`superpowers` plugin's per-task subagent dispatch partway through Task 8 —
-it had also been uninstalled from this environment mid-session, so this
-was as much a practical necessity as a preference). Tasks 8 and 9 were
-reviewed and verified directly, not via dispatched reviewer subagents.
-Both approaches produced the same rigor — real diffs read line-by-line,
-real live browser verification, nothing taken on the strength of a
-report alone — just via different mechanics. The design spec
-(`docs/superpowers/specs/2026-08-02-vendor-directory-design.md`) and plan
-(`docs/superpowers/plans/2026-08-02-vendor-directory.md`) are both
-committed to this branch and worth keeping even after merge — they're the
-record of *why*, same role this handoff plays for the rest of the app.
+plan-mode workflow M7 used for Tasks 8–9 — the user asked to stop using the
+`superpowers` plugin's per-task subagent dispatch partway through (it had
+also been uninstalled from this environment mid-session, so this was as
+much a practical necessity as a preference). Both approaches produced the
+same rigor — real diffs read line-by-line, real live browser verification
+end-to-end through the actual running app, nothing taken on the strength of
+a report alone — just via different mechanics. The design spec
+(`docs/superpowers/specs/2026-08-02-vendor-directory-design.md`) and
+implementation plan (`docs/superpowers/plans/2026-08-02-vendor-directory.md`)
+are both committed to `main` and worth reading for the *why* behind M8's
+decisions — same role this handoff plays for the rest of the app.
 
-**The progress ledger is not committed** —
-`.superpowers/sdd/2026-08-02-vendor-directory/progress.md` is gitignored,
-worktree-local scratch. It has the full task-by-task history (every fix
-round, every finding, every review verdict) that fed into this handoff's
-summaries. If you want that detail preserved past the worktree's lifetime,
-copy it out before removing the worktree — it won't survive
-`git worktree remove` / `ExitWorktree` with `action: "remove"`.
+**Bugs caught during the build**, not just theoretical: see §6 for the two
+RLS gaps caught while writing the design spec (before any code existed) and
+a build-breaking regression from Task 7 caught during Task 8's review.
+
+**The task-by-task progress ledger did not survive** — it lived at
+`.superpowers/sdd/2026-08-02-vendor-directory/progress.md`, gitignored
+worktree-local scratch, and was not copied out before the worktree was
+removed. Its content (every fix round, every finding, every review verdict)
+is summarized in §5's architecture decisions and §6's security posture
+above; the line-by-line detail is gone. Worth remembering for next time: if
+a ledger like this matters, copy it out (or paste key parts into a commit
+message) before removing the worktree that holds it.
 
 **Before merging:** the user hasn't been asked how they want this done —
 a straight `git merge` into `main`, or opened as a PR first (this repo has
