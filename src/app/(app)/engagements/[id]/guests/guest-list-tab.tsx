@@ -23,15 +23,20 @@ const RSVP_STYLES: Record<string, string> = {
   declined: "bg-red-100 text-red-700",
 };
 
+const PAGE_SIZE = 50;
+
 export default async function GuestListTab({
   engagementId,
   searchParams,
+  guestCap,
 }: {
   engagementId: string;
-  searchParams: { status?: string; group?: string; archived?: string };
+  searchParams: { status?: string; group?: string; archived?: string; page?: string };
+  guestCap: number;
 }) {
   const supabase = await createClient();
   const showArchived = searchParams.archived === "1";
+  const page = Math.max(1, Number(searchParams.page) || 1);
 
   const { data: allGuests } = await supabase
     .from("guests")
@@ -56,6 +61,7 @@ export default async function GuestListTab({
     .from("guests")
     .select(
       "id, full_name, side, guest_group, contact_phone, rsvp_status, archived_at, invite_token",
+      { count: "exact" },
     )
     .eq("engagement_id", engagementId)
     .order("full_name", { ascending: true });
@@ -71,12 +77,39 @@ export default async function GuestListTab({
     query = query.eq("guest_group", searchParams.group);
   }
 
-  const { data: guests, error } = await query;
+  const rangeStart = (page - 1) * PAGE_SIZE;
+  query = query.range(rangeStart, rangeStart + PAGE_SIZE - 1);
+
+  const { data: guests, error, count: filteredCount } = await query;
+
+  const totalPages = Math.max(1, Math.ceil((filteredCount ?? 0) / PAGE_SIZE));
 
   const baseHref = `/engagements/${engagementId}?tab=guests`;
+  const paramsHref = (extra: Record<string, string | undefined>) => {
+    const params = new URLSearchParams();
+    params.set("tab", "guests");
+    if (searchParams.status) params.set("status", searchParams.status);
+    if (searchParams.group) params.set("group", searchParams.group);
+    if (searchParams.archived) params.set("archived", searchParams.archived);
+    for (const [key, value] of Object.entries(extra)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    }
+    return `/engagements/${engagementId}?${params.toString()}`;
+  };
+
+  const overCap = guestCap > 0 && activeGuests.length > guestCap;
 
   return (
     <div>
+      {overCap && (
+        <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {activeGuests.length} guests — {activeGuests.length - guestCap} over
+          your guest cap of {guestCap}. This is advisory only; nothing is
+          blocked. Raise the cap from the Overview tab if this is expected.
+        </p>
+      )}
+
       <div className="mb-4 grid grid-cols-4 gap-4">
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
           <p className="text-xs uppercase text-neutral-500">Invited</p>
@@ -296,6 +329,34 @@ export default async function GuestListTab({
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-3 flex items-center justify-center gap-4 text-sm">
+          {page > 1 ? (
+            <Link
+              href={paramsHref({ page: String(page - 1) })}
+              className="text-neutral-500 hover:underline"
+            >
+              ← Previous
+            </Link>
+          ) : (
+            <span className="text-neutral-300">← Previous</span>
+          )}
+          <span className="text-neutral-500">
+            Page {page} of {totalPages}
+          </span>
+          {page < totalPages ? (
+            <Link
+              href={paramsHref({ page: String(page + 1) })}
+              className="text-neutral-500 hover:underline"
+            >
+              Next →
+            </Link>
+          ) : (
+            <span className="text-neutral-300">Next →</span>
+          )}
+        </div>
+      )}
 
       <div className="mt-3 text-sm">
         {showArchived ? (

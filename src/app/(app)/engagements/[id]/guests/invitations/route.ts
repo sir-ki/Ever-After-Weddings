@@ -1,4 +1,10 @@
 export const runtime = "nodejs";
+// Launch-readiness spec Part 5: bulk export was explicitly flagged during
+// Part 3 as a scale risk to decide on, not discover in production.
+// Rendering is batched below (concurrency, not fully sequential) and this
+// makes the time budget explicit — 60s is also the Vercel Hobby-plan
+// ceiling regardless of a higher value, so this doesn't assume a paid tier.
+export const maxDuration = 60;
 
 import { NextResponse } from "next/server";
 import JSZip from "jszip";
@@ -37,21 +43,34 @@ export async function GET(
   const zip = new JSZip();
   const usedNames = new Map<string, number>();
 
-  for (const guest of guests ?? []) {
-    const png = await renderInvitationCardPng({
-      guestName: guest.full_name,
-      coupleNames: engagement.display_name,
-      weddingDate: engagement.wedding_date,
-      ceremonyVenue: engagement.ceremony_venue,
-      inviteUrl: `${SITE_URL}/r/${guest.invite_token}`,
+  // Rendered in small concurrent batches rather than one at a time — the
+  // sharp/resvg work behind renderInvitationCardPng overlaps meaningfully,
+  // cutting wall-clock without unbounded memory use at once. At the
+  // seeded 300-guest scale this was measured directly (see the handoff/
+  // commit notes), not assumed.
+  const CONCURRENCY = 8;
+  for (let start = 0; start < (guests?.length ?? 0); start += CONCURRENCY) {
+    const batch = (guests ?? []).slice(start, start + CONCURRENCY);
+    const pngs = await Promise.all(
+      batch.map((guest) =>
+        renderInvitationCardPng({
+          guestName: guest.full_name,
+          coupleNames: engagement.display_name,
+          weddingDate: engagement.wedding_date,
+          ceremonyVenue: engagement.ceremony_venue,
+          inviteUrl: `${SITE_URL}/r/${guest.invite_token}`,
+        }),
+      ),
+    );
+
+    batch.forEach((guest, i) => {
+      const base = sanitizeFilenameSegment(guest.full_name);
+      const priorCount = usedNames.get(base) ?? 0;
+      usedNames.set(base, priorCount + 1);
+      const filename =
+        priorCount === 0 ? `${base}.png` : `${base} (${priorCount + 1}).png`;
+      zip.file(filename, pngs[i]);
     });
-
-    const base = sanitizeFilenameSegment(guest.full_name);
-    const priorCount = usedNames.get(base) ?? 0;
-    usedNames.set(base, priorCount + 1);
-    const filename = priorCount === 0 ? `${base}.png` : `${base} (${priorCount + 1}).png`;
-
-    zip.file(filename, png);
   }
 
   const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });

@@ -8,6 +8,7 @@ import DayOfTab from "./day-of/day-of-tab";
 import CheckpointsTab from "./checkpoints/checkpoints-tab";
 import VendorsTab from "./vendors/vendors-tab";
 import PeopleTab from "./people/people-tab";
+import { updateGuestCap } from "./actions";
 
 const TABS = [
   { key: "overview", label: "Overview" },
@@ -48,6 +49,7 @@ export default async function EngagementWorkspacePage({
     group?: string;
     archived?: string;
     error?: string;
+    page?: string;
   }>;
 }) {
   const { id } = await params;
@@ -66,6 +68,14 @@ export default async function EngagementWorkspacePage({
   if (!engagement) {
     notFound();
   }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: currentUserRow } = user
+    ? await supabase.from("users").select("global_role").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const isAccount = currentUserRow?.global_role === "account";
 
   const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
   const assignedName =
@@ -144,11 +154,42 @@ export default async function EngagementWorkspacePage({
           </div>
           <div>
             <dt className="text-neutral-500">Guest cap</dt>
-            <dd className="mt-1 text-neutral-900">{engagement.guest_cap}</dd>
+            {isAccount ? (
+              <dd className="mt-1">
+                <form
+                  action={updateGuestCap}
+                  className="flex items-center gap-2"
+                >
+                  <input type="hidden" name="engagement_id" value={id} />
+                  <input
+                    name="guest_cap"
+                    type="number"
+                    min={1}
+                    defaultValue={engagement.guest_cap}
+                    className="w-24 rounded-md border border-neutral-300 px-2 py-1 text-sm focus:border-neutral-500 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-md border border-neutral-300 px-2 py-1 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+                  >
+                    Save
+                  </button>
+                </form>
+                <p className="mt-1 text-xs text-neutral-400">
+                  Advisory only — the guest list warns past this, never blocks.
+                </p>
+              </dd>
+            ) : (
+              <dd className="mt-1 text-neutral-900">{engagement.guest_cap}</dd>
+            )}
           </div>
         </dl>
       ) : activeTab.key === "guests" ? (
-        <GuestListTab engagementId={id} searchParams={resolvedSearchParams} />
+        <GuestListTab
+          engagementId={id}
+          searchParams={resolvedSearchParams}
+          guestCap={engagement.guest_cap}
+        />
       ) : activeTab.key === "tables" ? (
         <TablesTab engagementId={id} />
       ) : activeTab.key === "website" ? (

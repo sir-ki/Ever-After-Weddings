@@ -10,7 +10,9 @@
     "seed": "node --env-file=.env.local scripts/seed.mjs",
     "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs",
     "verify:guest-token": "node --env-file=.env.local scripts/verify-guest-token-security.mjs",
-    "verify:invitation-card": "node --env-file=.env.local scripts/verify-invitation-card.mjs"
+    "verify:invitation-card": "node --env-file=.env.local scripts/verify-invitation-card.mjs",
+    "verify:rate-limit-scale": "node --env-file=.env.local scripts/verify-rate-limit-scale.mjs",
+    "verify:scanner-throughput": "node --env-file=.env.local scripts/verify-scanner-throughput.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
