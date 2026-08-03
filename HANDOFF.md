@@ -37,6 +37,17 @@ has the full writeup. Accent color only — `heading_font` and
 `corner_style` (also named in the template spec) are a documented,
 additive-later fast-follow, not implemented yet.
 
+**2026-08-03, post-launch-readiness: media library shipped.** The
+`media` table `docs/ever-after-data-model.md` planned from day one but
+deferred past MVP ("has no dependents") is now built — real Supabase
+Storage uploads for hero/story/gallery images on the wedding site,
+alongside the existing paste-a-URL fields rather than replacing them.
+§16 has the full writeup. Account/couple uploads only — guest uploads
+and the `is_approved` moderation queue the schema already anticipates
+are a documented fast-follow, not built. Vendor photos are untouched
+(still pasted URLs, a prior deliberate M8-era scope call, not
+re-litigated here).
+
 ---
 
 ## 1. Live pieces
@@ -962,3 +973,87 @@ name), and that `place-cards`/`table-numbers` PDFs still generate
 Reset back to the default afterward so Maria & Jon's live site isn't
 left in a test state. `npm run verify:guest-token` (18/18, unchanged)
 and `npm run build` both clean.
+
+---
+
+## 16. Media library (2026-08-03, post-launch-readiness)
+
+`docs/ever-after-data-model.md` planned a `media` table from the start
+(`storage_path, kind, uploaded_by, source, caption, is_approved`) but
+explicitly deferred it past MVP — "media can come after, it has no
+dependents." Every image on the site was a pasted external URL until
+now. Supabase Storage was completely unused anywhere in this codebase
+before this pass (confirmed by exploration: zero matches for
+`.storage`/`getPublicUrl`).
+
+**Scope decision**: **Account/couple uploads only, wedding-site images
+only.** The schema's own `source` (`couple`/`account`/`guest`) and
+`is_approved` columns anticipate a guest-upload moderation flow — real,
+separately-sized scope (a guest-facing upload surface, an approval
+queue, moderation notifications) — deliberately not built here.
+`is_approved` defaults `true` for this pass's only two sources, since
+there's no moderation queue yet to hold anything back from. Vendor
+photos (`vendor_photos.photo_url`) were **not** touched — that table
+has its own prior, explicit in-code comment from M8 choosing pasted
+URLs over Storage, a scope call this pass isn't re-litigating.
+
+**Additive, not a replacement.** `site_sections.content.hero.image_url`
+etc. are still plain URL strings — `SiteRenderer` and
+`buildSectionContent`/`updateSiteSection` needed **zero changes**. A
+new upload path just writes a Supabase Storage public URL into the
+same field a couple could otherwise paste an external URL into. Both
+paths coexist in the editor UI; pasting isn't removed.
+
+**`supabase/migrations/0014_media.sql`** — the `media` table, RLS via
+the same single-policy `has_engagement()`/`is_account()` shape every
+other engagement-scoped table uses. Also creates the `media` Storage
+bucket (public — published-site images must load for anonymous
+visitors without signed URLs, same as every other image on the site)
+and three `storage.objects` policies (insert/select/delete) scoped by
+path: every object must live at `{engagement_id}/{filename}`, checked
+via `storage.foldername(name)` — the standard Supabase idiom for
+folder-scoped bucket permissions — against the exact same two RLS
+helpers (`is_account()`, `has_engagement()`) every table policy in this
+schema already reuses. This is the first place those helpers govern
+`storage.objects` rather than a plain table.
+
+**No browser-side upload path introduced.** `src/lib/supabase/client.ts`
+(the browser Supabase client) still has zero callers — file uploads go
+through ordinary `"use server"` actions
+(`uploadHeroImage`/`uploadStoryImage`/`uploadGalleryPhotos` in
+`site/actions.ts`), the same pattern every other write in this app
+already uses. The one existing precedent for a real `File` object
+arriving through a server action (`guests/import`'s CSV upload) proved
+this works before building on it. Each action: validates file type
+(`image/jpeg`/`png`/`webp`) and size (8MB cap) server-side, uploads via
+the ordinary RLS-aware `createClient()` (never admin — Storage RLS
+enforces the same engagement scoping as everything else), inserts a
+`media` row, and folds the resulting public URL straight into the same
+`site_sections.content` upsert `updateSiteSection` already does — a
+successful upload is immediately live, not a separate save step.
+
+**Accepted, documented gap**: replacing an image leaves the old Storage
+object and `media` row orphaned — no cleanup job this pass, matching
+the schema's own "no dependents" framing. Worth a GC pass later if
+storage cost ever matters at this scale, not before.
+
+**A real verification-environment limitation, not a product gap**:
+this session's browser-automation tools could not drive a native file
+picker (`file_upload` requires the user to interactively grant a file
+to the session first, which wasn't available here) — so the actual
+site-editor upload buttons were never clicked in a live browser this
+pass. Instead, verified every layer the UI depends on directly against
+the live Supabase project: signed in as both a throwaway couple and a
+throwaway Account user, confirmed the Storage policies exactly as
+written (couple can upload to their own engagement's folder, cannot
+upload to another's, the public URL resolves with a real `fetch`), then
+replayed the exact sequence `uploadHeroImage` performs — upload →
+insert a `media` row → merge the public URL into
+`site_sections.content.hero.image_url` — end to end via script,
+confirmed the stored value matched the uploaded file's public URL, and
+cleaned up (media row, storage object, hero `image_url` reset, test
+users) so Maria & Jon's live site carries nothing from this pass. What's
+still owed: an actual click-through of the upload buttons in a real
+browser, first chance someone has one with file-picker access. `npm run
+build` clean; `verify-rls.mjs` extended with 3 new `media` isolation
+checks (47 total, all passing).

@@ -18,6 +18,9 @@ import {
   updateSiteSection,
   updateSiteSlug,
   updateSiteTheme,
+  uploadHeroImage,
+  uploadStoryImage,
+  uploadGalleryPhotos,
   publishSite,
   unpublishSite,
 } from "./actions";
@@ -352,6 +355,28 @@ export default async function SiteTab({
         </button>
       </form>
 
+      <form
+        action={uploadHeroImage}
+        encType="multipart/form-data"
+        className="flex items-center gap-3 rounded-lg border border-dashed border-neutral-300 bg-white px-4 py-3"
+      >
+        <input type="hidden" name="engagement_id" value={engagementId} />
+        <input type="hidden" name="site_id" value={site.id} />
+        <label className="text-xs text-neutral-500">Or upload a photo</label>
+        <input
+          type="file"
+          name="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="flex-1 text-sm"
+        />
+        <button
+          type="submit"
+          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+        >
+          Upload
+        </button>
+      </form>
+
       {/* Our story */}
       <form
         action={updateSiteSection}
@@ -401,6 +426,28 @@ export default async function SiteTab({
           className="mt-4 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
         >
           Save
+        </button>
+      </form>
+
+      <form
+        action={uploadStoryImage}
+        encType="multipart/form-data"
+        className="flex items-center gap-3 rounded-lg border border-dashed border-neutral-300 bg-white px-4 py-3"
+      >
+        <input type="hidden" name="engagement_id" value={engagementId} />
+        <input type="hidden" name="site_id" value={site.id} />
+        <label className="text-xs text-neutral-500">Or upload a photo</label>
+        <input
+          type="file"
+          name="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="flex-1 text-sm"
+        />
+        <button
+          type="submit"
+          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+        >
+          Upload
         </button>
       </form>
 
@@ -601,6 +648,29 @@ export default async function SiteTab({
           className="mt-4 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
         >
           Save
+        </button>
+      </form>
+
+      <form
+        action={uploadGalleryPhotos}
+        encType="multipart/form-data"
+        className="flex items-center gap-3 rounded-lg border border-dashed border-neutral-300 bg-white px-4 py-3"
+      >
+        <input type="hidden" name="engagement_id" value={engagementId} />
+        <input type="hidden" name="site_id" value={site.id} />
+        <label className="text-xs text-neutral-500">Or upload photos</label>
+        <input
+          type="file"
+          name="files"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          className="flex-1 text-sm"
+        />
+        <button
+          type="submit"
+          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+        >
+          Upload
         </button>
       </form>
 

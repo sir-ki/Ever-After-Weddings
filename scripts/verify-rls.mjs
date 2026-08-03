@@ -1017,6 +1017,94 @@ try {
   await admin.auth.admin.deleteUser(couple5UserId);
 }
 
+// Media library (post-launch-readiness): media table isolation. Same
+// single for-all policy shape as processional_entries/tables/
+// schedule_items. Storage bucket policies (media_objects_insert/select/
+// delete) use the same is_account()/has_engagement() helpers against
+// storage.foldername(name) — not exercised here, since that's a
+// Storage-API path rather than a plain table query; verified by hand
+// during this feature's own live walkthrough instead (see HANDOFF.md).
+const { data: mariaJonMedia } = await admin
+  .from("media")
+  .insert({
+    engagement_id: mariaJon.id,
+    storage_path: `${mariaJon.id}/rls-test.jpg`,
+    source: "account",
+  })
+  .select("id")
+  .single();
+const { data: erickErikaMedia } = await admin
+  .from("media")
+  .insert({
+    engagement_id: erickErika.id,
+    storage_path: `${erickErika.id}/rls-test.jpg`,
+    source: "account",
+  })
+  .select("id")
+  .single();
+
+const couple6Email = `rls-test-couple6-${Date.now()}@example.com`;
+const couple6Password = "verify-rls-temp-password-1234";
+const { data: created6, error: create6Error } = await admin.auth.admin.createUser({
+  email: couple6Email,
+  password: couple6Password,
+  email_confirm: true,
+  user_metadata: { full_name: "RLS Test Couple 6" },
+});
+if (create6Error) {
+  console.error("Failed to create sixth test couple:", create6Error.message);
+  process.exit(1);
+}
+const couple6UserId = created6.user.id;
+await admin.from("engagement_members").insert({
+  engagement_id: mariaJon.id,
+  user_id: couple6UserId,
+  role: "partner",
+});
+
+try {
+  const asCouple6 = createClient(url, anonKey);
+  const { error: signIn6Error } = await asCouple6.auth.signInWithPassword({
+    email: couple6Email,
+    password: couple6Password,
+  });
+  if (signIn6Error) {
+    console.error("Failed to sign in as sixth test couple:", signIn6Error.message);
+    process.exit(1);
+  }
+
+  const { data: visibleMedia } = await asCouple6.from("media").select("id, engagement_id");
+  const visibleMediaIds = new Set(visibleMedia?.map((m) => m.id));
+  check(
+    "couple's media list is scoped to their own engagement",
+    visibleMedia?.every((m) => m.engagement_id === mariaJon.id) &&
+      visibleMediaIds.has(mariaJonMedia.id) &&
+      !visibleMediaIds.has(erickErikaMedia.id),
+  );
+
+  const { data: otherMediaFetch } = await asCouple6
+    .from("media")
+    .select("id")
+    .eq("id", erickErikaMedia.id)
+    .maybeSingle();
+  check("couple cannot fetch the other engagement's media row by id", otherMediaFetch === null);
+
+  const { error: crossMediaInsertError } = await asCouple6.from("media").insert({
+    engagement_id: erickErika.id,
+    storage_path: `${erickErika.id}/should-not-be-allowed.jpg`,
+    source: "couple",
+  });
+  check(
+    "couple cannot add a media row to another engagement",
+    crossMediaInsertError !== null,
+  );
+} finally {
+  await admin.from("media").delete().eq("id", mariaJonMedia.id);
+  await admin.from("media").delete().eq("id", erickErikaMedia.id);
+  await admin.from("engagement_members").delete().eq("user_id", couple6UserId);
+  await admin.auth.admin.deleteUser(couple6UserId);
+}
+
 const secondAccountEmail = `rls-test-account-${Date.now()}@example.com`;
 const secondAccountPassword = "verify-rls-temp-password-1234";
 

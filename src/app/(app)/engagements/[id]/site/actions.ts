@@ -242,6 +242,182 @@ export async function updateSiteSection(formData: FormData) {
   revalidatePath(`/engagements/${engagementId}`);
 }
 
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+// Real per-couple photo uploads (media library, post-launch-readiness).
+// Account/couple uploads only this pass — no guest-upload moderation
+// flow yet, see the migration's own comment. Storage RLS
+// (media_objects_insert) enforces the same engagement scoping as every
+// other write in this app; this validation is just a clean error
+// message, same discipline every other action in this file follows.
+async function uploadToMediaLibrary(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  engagementId: string,
+  file: File,
+): Promise<{ url: string } | { error: string }> {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return { error: "Please upload a JPEG, PNG, or WebP image." };
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return { error: "Images must be 8MB or smaller." };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = user
+    ? await supabase.from("users").select("global_role").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const source = profile?.global_role === "account" ? "account" : "couple";
+
+  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${engagementId}/${crypto.randomUUID()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage.from("media").upload(path, file, {
+    contentType: file.type,
+  });
+  if (uploadError) {
+    return { error: "Could not upload the image. Please try again." };
+  }
+
+  const { error: insertError } = await supabase.from("media").insert({
+    engagement_id: engagementId,
+    storage_path: path,
+    kind: "photo",
+    uploaded_by: user?.id,
+    source,
+  });
+  if (insertError) {
+    await supabase.storage.from("media").remove([path]);
+    return { error: "Could not save the upload. Please try again." };
+  }
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("media").getPublicUrl(path);
+
+  return { url: publicUrl };
+}
+
+export async function uploadHeroImage(formData: FormData) {
+  const engagementId = formData.get("engagement_id") as string;
+  const siteId = formData.get("site_id") as string;
+  const file = formData.get("file") as File;
+  const supabase = await createClient();
+
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/engagements/${engagementId}?tab=website&error=${encodeURIComponent("Choose a file to upload.")}`);
+  }
+
+  const result = await uploadToMediaLibrary(supabase, engagementId, file);
+  if ("error" in result) {
+    redirect(`/engagements/${engagementId}?tab=website&error=${encodeURIComponent(result.error)}`);
+  }
+
+  const { data: existing } = await supabase
+    .from("site_sections")
+    .select("content")
+    .eq("site_id", siteId)
+    .eq("section_type", "hero")
+    .maybeSingle();
+
+  await supabase.from("site_sections").upsert(
+    {
+      site_id: siteId,
+      section_type: "hero",
+      content: { ...(existing?.content as object), image_url: result.url },
+      is_visible: true,
+      sort_order: SECTION_SORT_ORDER.hero,
+    },
+    { onConflict: "site_id,section_type" },
+  );
+
+  revalidatePath(`/engagements/${engagementId}`);
+}
+
+export async function uploadStoryImage(formData: FormData) {
+  const engagementId = formData.get("engagement_id") as string;
+  const siteId = formData.get("site_id") as string;
+  const file = formData.get("file") as File;
+  const supabase = await createClient();
+
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/engagements/${engagementId}?tab=website&error=${encodeURIComponent("Choose a file to upload.")}`);
+  }
+
+  const result = await uploadToMediaLibrary(supabase, engagementId, file);
+  if ("error" in result) {
+    redirect(`/engagements/${engagementId}?tab=website&error=${encodeURIComponent(result.error)}`);
+  }
+
+  const { data: existing } = await supabase
+    .from("site_sections")
+    .select("content, is_visible")
+    .eq("site_id", siteId)
+    .eq("section_type", "story")
+    .maybeSingle();
+
+  await supabase.from("site_sections").upsert(
+    {
+      site_id: siteId,
+      section_type: "story",
+      content: { ...(existing?.content as object), image_url: result.url },
+      is_visible: existing?.is_visible ?? true,
+      sort_order: SECTION_SORT_ORDER.story,
+    },
+    { onConflict: "site_id,section_type" },
+  );
+
+  revalidatePath(`/engagements/${engagementId}`);
+}
+
+export async function uploadGalleryPhotos(formData: FormData) {
+  const engagementId = formData.get("engagement_id") as string;
+  const siteId = formData.get("site_id") as string;
+  const files = formData.getAll("files") as File[];
+  const supabase = await createClient();
+
+  const realFiles = files.filter((f) => f instanceof File && f.size > 0);
+  if (realFiles.length === 0) {
+    redirect(`/engagements/${engagementId}?tab=website&error=${encodeURIComponent("Choose at least one file to upload.")}`);
+  }
+
+  const uploadedUrls: string[] = [];
+  for (const file of realFiles) {
+    const result = await uploadToMediaLibrary(supabase, engagementId, file);
+    if ("error" in result) {
+      redirect(`/engagements/${engagementId}?tab=website&error=${encodeURIComponent(result.error)}`);
+    }
+    uploadedUrls.push(result.url);
+  }
+
+  const { data: existing } = await supabase
+    .from("site_sections")
+    .select("content, is_visible")
+    .eq("site_id", siteId)
+    .eq("section_type", "gallery")
+    .maybeSingle();
+
+  const existingContent = (existing?.content ?? {}) as { heading?: string; media_urls?: string[]; layout?: string };
+
+  await supabase.from("site_sections").upsert(
+    {
+      site_id: siteId,
+      section_type: "gallery",
+      content: {
+        ...existingContent,
+        media_urls: [...(existingContent.media_urls ?? []), ...uploadedUrls],
+      },
+      is_visible: existing?.is_visible ?? true,
+      sort_order: SECTION_SORT_ORDER.gallery,
+    },
+    { onConflict: "site_id,section_type" },
+  );
+
+  revalidatePath(`/engagements/${engagementId}`);
+}
+
 export async function updateSiteTheme(formData: FormData) {
   const engagementId = formData.get("engagement_id") as string;
   const siteId = formData.get("site_id") as string;
