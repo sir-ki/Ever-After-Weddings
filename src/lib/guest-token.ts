@@ -94,6 +94,7 @@ export type DayHub = {
   unlocked: boolean;
   guestName: string;
   rsvpStatus: string;
+  weddingDate: string | null;
   announcement: string | null;
   schedule: ScheduleItem[];
   tableLabel: string | null;
@@ -131,6 +132,7 @@ export async function getDayHubByToken(token: string): Promise<DayHub | null> {
       unlocked: false,
       guestName: base.guest.full_name,
       rsvpStatus: base.guest.rsvp_status,
+      weddingDate: base.engagement.wedding_date,
       announcement: null,
       schedule: [],
       tableLabel: null,
@@ -191,6 +193,7 @@ export async function getDayHubByToken(token: string): Promise<DayHub | null> {
     unlocked: true,
     guestName: base.guest.full_name,
     rsvpStatus: base.guest.rsvp_status,
+    weddingDate: base.engagement.wedding_date,
     announcement: announcement?.body ?? null,
     schedule: scheduleItems ?? [],
     tableLabel,

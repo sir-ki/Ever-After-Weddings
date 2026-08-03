@@ -8,8 +8,8 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const inputClass =
-  "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none";
-const labelClass = "mb-1 block text-sm font-medium text-neutral-700";
+  "w-full rounded-[10px] border border-[var(--ea-border)] bg-[var(--ea-canvas)] px-3 py-2.5 text-sm text-[var(--ea-ink)] focus:border-[var(--ea-accent)] focus:outline-none";
+const labelClass = "mb-1 block text-sm text-[var(--ea-ink-secondary)]";
 
 export default async function InviteAcceptPage({
   params,
@@ -24,12 +24,12 @@ export default async function InviteAcceptPage({
 
   if (!invite) {
     return (
-      <div className="min-h-screen bg-neutral-50 px-4 py-12">
-        <div className="mx-auto max-w-md rounded-lg border border-neutral-200 bg-white p-8 text-center">
-          <h1 className="text-lg font-semibold text-neutral-900">
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="mx-auto max-w-md rounded-[10px] border border-[var(--ea-border)] bg-[var(--ea-blush)] p-8 text-center">
+          <h1 className="ea-font-serif text-xl text-[var(--ea-ink)]">
             This invite link is invalid or has expired.
           </h1>
-          <p className="mt-2 text-sm text-neutral-500">
+          <p className="mt-2 text-sm text-[var(--ea-ink-secondary)]">
             Ask whoever sent it to send you a new one.
           </p>
         </div>
@@ -45,42 +45,35 @@ export default async function InviteAcceptPage({
     .maybeSingle();
 
   return (
-    <div className="min-h-screen bg-neutral-50 px-4 py-12">
-      <div className="mx-auto max-w-md rounded-lg border border-neutral-200 bg-white p-8">
-        <p className="text-sm text-neutral-500">You&apos;ve been invited to</p>
-        <h1 className="text-2xl font-semibold text-neutral-900">
+    <div className="min-h-screen px-4 py-12">
+      <div className="mx-auto max-w-md rounded-[10px] border border-[var(--ea-border)] bg-[var(--ea-canvas)] p-8">
+        <p className="text-sm text-[var(--ea-ink-secondary)]">You&apos;ve been invited to</p>
+        <h1 className="ea-font-serif mt-1 text-[28px] leading-[1.2] text-[var(--ea-ink)]">
           {invite.engagementDisplayName}
         </h1>
-        <p className="mt-1 text-sm text-neutral-600">
+        <p className="mt-1 text-sm text-[var(--ea-ink-secondary)]">
           as a {ROLE_LABELS[invite.role] ?? invite.role}
         </p>
 
         {error && (
-          <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </p>
+          <p className="mt-4 rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         )}
 
-        <div className="my-6 h-px bg-neutral-100" />
+        <div className="my-6 h-px bg-[var(--ea-border)]" />
 
         {existingUser ? (
           <form action={acceptInviteExisting} className="space-y-3">
             <input type="hidden" name="token" value={token} />
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm text-[var(--ea-ink-secondary)]">
               An account already exists for {invite.email}. Sign in to accept.
             </p>
             <div>
               <label className={labelClass}>Password</label>
-              <input
-                name="password"
-                type="password"
-                required
-                className={inputClass}
-              />
+              <input name="password" type="password" required className={inputClass} />
             </div>
             <button
               type="submit"
-              className="w-full rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+              className="min-h-[44px] w-full rounded-[10px] bg-[var(--ea-accent)] px-3 py-2.5 text-sm font-medium text-[#FFF8F5] hover:opacity-90"
             >
               Sign in and accept
             </button>
@@ -104,7 +97,7 @@ export default async function InviteAcceptPage({
             </div>
             <button
               type="submit"
-              className="w-full rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+              className="min-h-[44px] w-full rounded-[10px] bg-[var(--ea-accent)] px-3 py-2.5 text-sm font-medium text-[#FFF8F5] hover:opacity-90"
             >
               Create account and accept
             </button>

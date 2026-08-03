@@ -37,12 +37,12 @@ export default async function PublicSitePage({
   // response, so a stranger can't use this to probe for a draft site.
   if (!site || !engagement) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-rose-50 px-4">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--ea-canvas)] px-4">
         <div className="max-w-sm text-center">
-          <p className="text-lg font-medium text-neutral-900">
+          <p className="ea-font-serif text-xl text-[var(--ea-ink)]">
             This site isn&apos;t live yet.
           </p>
-          <p className="mt-2 text-sm text-neutral-500">
+          <p className="mt-2 text-sm text-[var(--ea-ink-secondary)]">
             Check back soon, or reach out to the couple directly.
           </p>
         </div>
@@ -77,7 +77,7 @@ export default async function PublicSitePage({
   return (
     <>
       {site.status === "draft" && (
-        <div className="bg-amber-900 px-4 py-2 text-center text-sm text-amber-50">
+        <div className="bg-[var(--ea-accent-ink)] px-4 py-2 text-center text-sm text-[#FFF8F5]">
           Draft preview — not visible to the public until published.
         </div>
       )}

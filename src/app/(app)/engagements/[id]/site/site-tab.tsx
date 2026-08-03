@@ -11,6 +11,7 @@ import SiteRenderer, {
   type EntourageContent,
   type FooterContent,
 } from "@/components/site-renderer";
+import { ptSerif, ptSans } from "@/lib/guest-fonts";
 import {
   createSite,
   updateSiteSection,
@@ -122,7 +123,15 @@ export default async function SiteTab({
             </a>
           )}
         </div>
-        <div className="overflow-hidden rounded-lg border border-neutral-200">
+        {/* This preview must render identically to the public /s/[slug]
+            page (the M5/M8 constraint SiteRenderer is already built to
+            honor) — so it gets the same guest-facing theme scope as the
+            public route, even though it lives under (app)/*. Nothing
+            else in this file, or elsewhere under (app)/*, gets this
+            class. */}
+        <div
+          className={`ea-theme ${ptSerif.variable} ${ptSans.variable} overflow-hidden rounded-lg border border-neutral-200`}
+        >
           <SiteRenderer
             sections={sections}
             fallbackHeadline={engagement?.display_name ?? ""}

@@ -37,27 +37,38 @@ export default async function GuestRsvpPage({
     !!site?.day_hub_unlocked_at && new Date(site.day_hub_unlocked_at) <= new Date();
 
   return (
-    <div className="min-h-screen bg-rose-50 px-4 py-12">
-      <div className="mx-auto max-w-md rounded-lg border border-rose-100 bg-white p-8 shadow-sm">
-        <p className="text-sm text-neutral-500">You&apos;re invited to</p>
-        <h1 className="text-2xl font-semibold text-neutral-900">
-          {engagement.display_name}
-        </h1>
-        <p className="mt-1 text-sm text-neutral-600">
-          {formatDate(engagement.wedding_date) ?? "Date to be announced"}
-          {engagement.ceremony_venue ? ` · ${engagement.ceremony_venue}` : ""}
+    <div className="min-h-screen pb-16">
+      <div className="ea-hero-banner" style={{ height: 260 }}>
+        <div className="ea-hero-banner__art" />
+        <div className="ea-hero-banner__arch" />
+        <div className="ea-hero-banner__scrim" />
+        <div className="ea-hero-banner__content flex h-full flex-col items-center justify-end gap-1 px-6 pb-6 text-center">
+          <p className="text-xs tracking-wide text-[var(--ea-ink-secondary)] lowercase">
+            you&apos;re invited to
+          </p>
+          <h1 className="ea-font-serif mt-1 text-[40px] leading-[1.15] text-[var(--ea-ink)] text-balance">
+            {engagement.display_name}
+          </h1>
+          <p className="mt-2 text-sm text-[var(--ea-ink-secondary)]">
+            {formatDate(engagement.wedding_date) ?? "Date to be announced"}
+          </p>
+          {engagement.ceremony_venue && (
+            <p className="text-xs text-[var(--ea-ink-muted)]">{engagement.ceremony_venue}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="ea-fade-in mx-auto max-w-md px-6 pt-6 text-center">
+        <p className="text-sm text-[var(--ea-ink-secondary)]">hi</p>
+        <p className="ea-font-serif mt-1 text-xl text-[var(--ea-accent-ink)]">
+          {guest.full_name}
         </p>
 
         {!deadlinePassed && engagement.rsvp_deadline && (
-          <p className="mt-2 text-sm font-medium text-neutral-700">
-            Please reply by {formatDate(engagement.rsvp_deadline)}.
+          <p className="mt-3 text-xs text-[var(--ea-ink-muted)]">
+            Please reply by {formatDate(engagement.rsvp_deadline)}
           </p>
         )}
-
-        <div className="my-6 h-px bg-neutral-100" />
-
-        <p className="text-sm text-neutral-500">Hi</p>
-        <p className="text-lg font-medium text-neutral-900">{guest.full_name}</p>
 
         <RsvpForm
           token={token}

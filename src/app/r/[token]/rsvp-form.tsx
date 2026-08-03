@@ -5,6 +5,10 @@ import type { PublicGuest } from "@/lib/guest-token";
 
 type Stage = "choose" | "details" | "confirmed";
 
+const inputClass =
+  "w-full rounded-[10px] border border-[var(--ea-border)] bg-[var(--ea-canvas)] px-3 py-2.5 text-sm text-[var(--ea-ink)] focus:border-[var(--ea-accent)] focus:outline-none";
+const labelClass = "mb-1 block text-sm text-[var(--ea-ink-secondary)]";
+
 export default function RsvpForm({
   token,
   guest,
@@ -34,22 +38,22 @@ export default function RsvpForm({
 
   if (deadlinePassed) {
     return (
-      <div className="mt-6 rounded-md bg-neutral-50 p-4 text-sm text-neutral-600">
-        <p>RSVPs have closed for this wedding.</p>
+      <div className="mt-6 rounded-[10px] border border-[var(--ea-border)] p-5 text-left text-sm text-[var(--ea-ink-secondary)]">
+        <p className="ea-font-serif text-lg text-[var(--ea-ink)]">Replies have closed</p>
         {initialStatus && (
-          <p className="mt-1">
+          <p className="mt-2">
             We have you down as{" "}
-            <strong>
+            <strong className="text-[var(--ea-ink)]">
               {initialStatus === "accepted" ? "attending" : "not attending"}
             </strong>
             .
           </p>
         )}
-        <p className="mt-1">Need to change your answer? Message the couple directly.</p>
+        <p className="mt-2">Need to change your answer? Message the couple directly.</p>
         {hubUnlocked && (
           <a
             href={`/r/${token}/day`}
-            className="mt-3 inline-block font-medium text-neutral-900 hover:underline"
+            className="mt-3 inline-block font-medium text-[var(--ea-accent-ink)] hover:underline"
           >
             Open the day-of hub →
           </a>
@@ -94,18 +98,23 @@ export default function RsvpForm({
 
   if (stage === "confirmed" && selected) {
     return (
-      <div className="mt-6">
+      <div className="mt-6 rounded-[10px] bg-[var(--ea-blush)] p-6 text-center">
         {selected === "accepted" ? (
           <>
-            <p className="text-lg font-medium text-neutral-900">See you there.</p>
-            <p className="mt-1 text-sm text-neutral-600">
-              Thanks — we&apos;ve got you down.
+            <span className="inline-block rounded-full bg-[var(--ea-champagne)] px-3 py-1 text-[11px] tracking-wide text-[var(--ea-accent-ink)] lowercase">
+              you&apos;re in
+            </span>
+            <p className="ea-font-serif mt-2 text-xl text-[var(--ea-ink)]">
+              See you there, {guest.full_name.split(" ")[0]}
+            </p>
+            <p className="mt-1 text-sm text-[var(--ea-ink-secondary)]">
+              We can&apos;t wait to celebrate with you.
             </p>
           </>
         ) : (
           <>
-            <p className="text-lg font-medium text-neutral-900">We&apos;ll miss you.</p>
-            <p className="mt-1 text-sm text-neutral-600">
+            <p className="ea-font-serif text-xl text-[var(--ea-ink)]">We&apos;ll miss you</p>
+            <p className="mt-1 text-sm text-[var(--ea-ink-secondary)]">
               Thanks for letting us know.
             </p>
           </>
@@ -113,7 +122,7 @@ export default function RsvpForm({
         {hubUnlocked && (
           <a
             href={`/r/${token}/day`}
-            className="mt-4 block font-medium text-neutral-900 hover:underline"
+            className="mt-4 block text-sm font-medium text-[var(--ea-accent-ink)] hover:underline"
           >
             Open the day-of hub →
           </a>
@@ -121,7 +130,7 @@ export default function RsvpForm({
         <button
           type="button"
           onClick={() => setStage("details")}
-          className="mt-3 text-sm text-neutral-500 hover:underline"
+          className="mt-3 text-sm text-[var(--ea-ink-muted)] hover:underline"
         >
           Need to change your answer?
         </button>
@@ -131,80 +140,70 @@ export default function RsvpForm({
 
   if (stage === "details" && selected) {
     return (
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-4 text-left">
         <button
           type="button"
           onClick={() => setStage("choose")}
-          className="text-sm text-neutral-500 hover:underline"
+          className="text-sm text-[var(--ea-ink-muted)] hover:underline"
         >
           ← Change response
         </button>
-        <p className="text-sm font-medium text-neutral-700">
+        <p className="text-sm font-medium text-[var(--ea-ink)]">
           {selected === "accepted" ? "Joyfully accepting" : "Regretfully declining"}
         </p>
 
         {selected === "accepted" && (
           <>
             <div>
-              <label className="mb-1 block text-sm font-medium text-neutral-700">
-                Best number to reach you on the day
-              </label>
+              <label className={labelClass}>Best number to reach you on the day</label>
               <input
                 type="text"
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
-                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                className={inputClass}
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-neutral-700">
-                Meal preference
-              </label>
+              <label className={labelClass}>Meal preference</label>
               <input
                 type="text"
                 value={mealChoice}
                 onChange={(e) => setMealChoice(e.target.value)}
-                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                className={inputClass}
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-neutral-700">
-                A song that&apos;ll get you on the dance floor?
-              </label>
+              <label className={labelClass}>A song that&apos;ll get you on the dance floor?</label>
               <input
                 type="text"
                 value={songRequest}
                 onChange={(e) => setSongRequest(e.target.value)}
-                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+                className={inputClass}
               />
             </div>
           </>
         )}
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-neutral-700">
-            Anything we should know?
-          </label>
+          <label className={labelClass}>Anything we should know?</label>
           <textarea
             rows={3}
             value={guestNotes}
             onChange={(e) => setGuestNotes(e.target.value)}
             placeholder="Dietary needs, allergies, mobility, arriving late…"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+            className={inputClass}
           />
         </div>
 
         {error && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </p>
+          <p className="rounded-[10px] bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         )}
 
         <button
           type="button"
           disabled={submitting}
           onClick={submit}
-          className="w-full rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+          className="min-h-[44px] w-full rounded-[10px] bg-[var(--ea-accent)] px-3 py-2.5 text-sm font-medium text-[#FFF8F5] hover:opacity-90 disabled:opacity-50"
         >
           {submitting ? "Saving…" : "Submit RSVP"}
         </button>
@@ -214,23 +213,21 @@ export default function RsvpForm({
 
   return (
     <div className="mt-6">
-      <p className="mb-3 text-sm font-medium text-neutral-700">
-        Will you be joining us?
-      </p>
-      <div className="flex gap-3">
+      <p className="mb-3 text-sm font-medium text-[var(--ea-ink)]">Will you be joining us?</p>
+      <div className="flex flex-col gap-3">
         <button
           type="button"
           onClick={() => choose("accepted")}
-          className="flex-1 rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          className="min-h-[44px] w-full rounded-[10px] bg-[var(--ea-accent)] px-3 py-2.5 text-sm font-medium text-[#FFF8F5] hover:opacity-90"
         >
-          Joyfully accepts
+          Accept with pleasure
         </button>
         <button
           type="button"
           onClick={() => choose("declined")}
-          className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+          className="min-h-[44px] w-full rounded-[10px] border border-[var(--ea-border)] px-3 py-2.5 text-sm font-medium text-[var(--ea-ink)] hover:bg-[var(--ea-blush)]"
         >
-          Regretfully declines
+          Can&apos;t make it
         </button>
       </div>
     </div>

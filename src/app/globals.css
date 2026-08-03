@@ -24,3 +24,106 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ---------------------------------------------------------------------
+ * Guest-facing design tokens (launch-readiness spec Part 4).
+ * Scoped to a `.ea-theme` class, never `:root` — applied only by the
+ * layout.tsx files under src/app/r, s, directory, invite (plus one
+ * deliberate exception, the site preview in (app)/engagements/[id]/
+ * site/site-tab.tsx). src/app/(app)/* never gets this class.
+ * These are the spec's own default preset values; sites.theme is still
+ * an unwired jsonb stub, so every couple gets this preset for now.
+ * ------------------------------------------------------------------ */
+.ea-theme {
+  --ea-canvas: #FDFAF7;
+  --ea-blush: #F9EFEA;
+  --ea-champagne: #F2E4DA;
+  --ea-border: #E8DAD2;
+  --ea-ink: #3D2E2B;
+  --ea-ink-secondary: #6B5551;
+  --ea-ink-muted: #7E6663;
+  --ea-accent: #A85D5B;
+  --ea-accent-ink: #8E4A48;
+
+  background: var(--ea-canvas);
+  color: var(--ea-ink);
+  font-family: var(--font-ea-sans), sans-serif;
+}
+
+.ea-font-serif {
+  font-family: var(--font-ea-serif), serif;
+}
+
+/* A static painterly wash standing in for "no venue photo yet" — per
+ * the spec's own hero-treatment note, this should look deliberate, not
+ * empty. Soft white scrim over the art keeps text legible on top,
+ * the opposite of the usual dark-scrim/white-text hero. No parallax:
+ * approved in mockup review, then dropped to avoid fighting the spec's
+ * own "nothing that delays content" motion rule.
+ */
+.ea-hero-banner {
+  position: relative;
+  overflow: hidden;
+}
+
+.ea-hero-banner__art {
+  position: absolute;
+  inset: -20% -10% -30% -10%;
+  background:
+    radial-gradient(38% 32% at 22% 30%, color-mix(in srgb, var(--ea-accent) 55%, transparent) 0%, transparent 70%),
+    radial-gradient(30% 26% at 72% 18%, color-mix(in srgb, var(--ea-accent-ink) 40%, transparent) 0%, transparent 72%),
+    radial-gradient(45% 40% at 80% 62%, color-mix(in srgb, var(--ea-champagne) 90%, transparent) 0%, transparent 75%),
+    radial-gradient(50% 45% at 15% 78%, color-mix(in srgb, var(--ea-blush) 95%, transparent) 0%, transparent 75%),
+    linear-gradient(160deg, var(--ea-champagne) 0%, var(--ea-blush) 55%, var(--ea-canvas) 100%);
+  filter: blur(2px) saturate(1.05);
+}
+
+.ea-hero-banner__art--photo {
+  background-size: cover;
+  background-position: center;
+  filter: none;
+}
+
+.ea-hero-banner__arch {
+  position: absolute;
+  left: 50%;
+  bottom: -6%;
+  width: 210%;
+  height: 190%;
+  transform: translateX(-50%);
+  border-radius: 50% 50% 0 0 / 38% 38% 0 0;
+  background: color-mix(in srgb, var(--ea-canvas) 88%, transparent);
+  opacity: 0.55;
+}
+
+.ea-hero-banner__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ea-canvas) 8%, transparent) 0%,
+    color-mix(in srgb, var(--ea-canvas) 55%, transparent) 62%,
+    var(--ea-canvas) 100%
+  );
+}
+
+.ea-hero-banner__content {
+  position: relative;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ea-fade-in {
+    animation: ea-rise 300ms ease-out;
+  }
+}
+
+@keyframes ea-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

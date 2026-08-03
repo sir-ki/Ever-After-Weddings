@@ -148,46 +148,58 @@ export default function SiteRenderer({
   const showFooter = footerSection?.is_visible && !!footerContent.message;
 
   const days = heroContent.show_countdown ? daysUntil(weddingDate) : null;
+  const heading = "ea-font-serif text-[26px] leading-[1.3] text-[var(--ea-ink)]";
+  const sectionPad = "px-6 py-12 sm:py-[72px]";
 
   return (
-    <div className="min-h-screen bg-rose-50">
-      <section className="bg-white px-6 py-20 text-center">
-        <h1 className="text-3xl font-semibold text-neutral-900 sm:text-4xl">
-          {heroContent.headline || fallbackHeadline}
-        </h1>
-        {heroContent.subhead && (
-          <p className="mt-3 text-lg text-neutral-600">{heroContent.subhead}</p>
-        )}
-        {days !== null && (
-          <p className="mt-4 text-sm font-medium text-rose-700">
-            {days === 0 ? "Today's the day" : `${days} day${days === 1 ? "" : "s"} to go`}
-          </p>
-        )}
+    <div className="min-h-screen bg-[var(--ea-canvas)] text-[var(--ea-ink)]">
+      <section className="ea-hero-banner" style={{ minHeight: 420 }}>
+        <div
+          className={`ea-hero-banner__art${heroContent.image_url ? " ea-hero-banner__art--photo" : ""}`}
+          style={heroContent.image_url ? { backgroundImage: `url(${heroContent.image_url})` } : undefined}
+        />
+        <div className="ea-hero-banner__arch" />
+        <div className="ea-hero-banner__scrim" />
+        <div className="ea-hero-banner__content flex min-h-[420px] flex-col items-center justify-end gap-2 px-6 pb-16 text-center">
+          <h1 className="ea-font-serif text-[40px] leading-[1.15] text-[var(--ea-ink)] text-balance sm:text-[48px]">
+            {heroContent.headline || fallbackHeadline}
+          </h1>
+          {heroContent.subhead && (
+            <p className="max-w-md text-base text-[var(--ea-ink-secondary)]">
+              {heroContent.subhead}
+            </p>
+          )}
+          {days !== null && (
+            <p className="mt-2 text-sm font-medium text-[var(--ea-accent-ink)]">
+              {days === 0 ? "Today's the day" : `${days} day${days === 1 ? "" : "s"} to go`}
+            </p>
+          )}
+        </div>
       </section>
 
       {showStory && (
-        <section className="mx-auto max-w-2xl px-6 py-16">
-          <h2 className="mb-4 text-2xl font-semibold text-neutral-900">
-            {storyContent.heading || "Our story"}
-          </h2>
-          <p className="whitespace-pre-line text-neutral-700">{storyContent.body}</p>
+        <section className={`mx-auto max-w-2xl ${sectionPad}`}>
+          <h2 className={`mb-4 ${heading}`}>{storyContent.heading || "Our story"}</h2>
+          <p className="whitespace-pre-line text-base leading-relaxed text-[var(--ea-ink-secondary)]">
+            {storyContent.body}
+          </p>
         </section>
       )}
 
       {showTheDay && (
-        <section className="bg-white px-6 py-16">
+        <section className={`bg-[var(--ea-blush)] ${sectionPad}`}>
           <div className="mx-auto max-w-2xl">
-            <h2 className="mb-4 text-2xl font-semibold text-neutral-900">The day</h2>
-            <div className="space-y-4 text-neutral-700">
+            <h2 className={`mb-4 ${heading}`}>The day</h2>
+            <div className="space-y-4 text-base text-[var(--ea-ink-secondary)]">
               <div>
-                <p className="font-medium text-neutral-900">Ceremony</p>
+                <p className="text-[var(--ea-ink)]">Ceremony</p>
                 {theDayContent.ceremony_venue && <p>{theDayContent.ceremony_venue}</p>}
                 {theDayContent.ceremony_address && <p>{theDayContent.ceremony_address}</p>}
                 {theDayContent.ceremony_time && <p>{formatTime(theDayContent.ceremony_time)}</p>}
               </div>
               {showReception && (
                 <div>
-                  <p className="font-medium text-neutral-900">Reception</p>
+                  <p className="text-[var(--ea-ink)]">Reception</p>
                   {theDayContent.reception_venue && <p>{theDayContent.reception_venue}</p>}
                   {theDayContent.reception_address && <p>{theDayContent.reception_address}</p>}
                   {theDayContent.reception_time && (
@@ -196,7 +208,7 @@ export default function SiteRenderer({
                 </div>
               )}
               {theDayContent.travel_note && (
-                <p className="text-sm text-neutral-500">{theDayContent.travel_note}</p>
+                <p className="text-sm text-[var(--ea-ink-muted)]">{theDayContent.travel_note}</p>
               )}
             </div>
           </div>
@@ -204,10 +216,8 @@ export default function SiteRenderer({
       )}
 
       {showGallery && (
-        <section className="mx-auto max-w-4xl px-6 py-16">
-          <h2 className="mb-4 text-2xl font-semibold text-neutral-900">
-            {galleryContent.heading || "Gallery"}
-          </h2>
+        <section className={`mx-auto max-w-4xl ${sectionPad}`}>
+          <h2 className={`mb-4 ${heading}`}>{galleryContent.heading || "Gallery"}</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {galleryContent.media_urls?.map((url) => (
               // eslint-disable-next-line @next/next/no-img-element
@@ -215,7 +225,7 @@ export default function SiteRenderer({
                 key={url}
                 src={url}
                 alt=""
-                className="aspect-square w-full rounded-md object-cover"
+                className="aspect-square w-full rounded-[10px] object-cover"
               />
             ))}
           </div>
@@ -223,32 +233,32 @@ export default function SiteRenderer({
       )}
 
       {showDetails && (
-        <section className="bg-white px-6 py-16">
+        <section className={`bg-[var(--ea-blush)] ${sectionPad}`}>
           <div className="mx-auto max-w-2xl">
-            <h2 className="mb-4 text-2xl font-semibold text-neutral-900">Details</h2>
-            <div className="space-y-3 text-neutral-700">
+            <h2 className={`mb-4 ${heading}`}>Details</h2>
+            <div className="space-y-3 text-base text-[var(--ea-ink-secondary)]">
               {detailsContent.dress_code && (
                 <p>
-                  <span className="font-medium text-neutral-900">Dress code: </span>
+                  <span className="text-[var(--ea-ink)]">Dress code: </span>
                   {detailsContent.dress_code}
                   {detailsContent.dress_code_note ? ` — ${detailsContent.dress_code_note}` : ""}
                 </p>
               )}
               {detailsContent.children_policy && (
                 <p>
-                  <span className="font-medium text-neutral-900">Children: </span>
+                  <span className="text-[var(--ea-ink)]">Children: </span>
                   {detailsContent.children_policy}
                 </p>
               )}
               {detailsContent.gifts_note && (
                 <p>
-                  <span className="font-medium text-neutral-900">Gifts: </span>
+                  <span className="text-[var(--ea-ink)]">Gifts: </span>
                   {detailsContent.gifts_note}
                 </p>
               )}
               {detailsContent.parking_note && (
                 <p>
-                  <span className="font-medium text-neutral-900">Parking: </span>
+                  <span className="text-[var(--ea-ink)]">Parking: </span>
                   {detailsContent.parking_note}
                 </p>
               )}
@@ -256,7 +266,7 @@ export default function SiteRenderer({
                 <div className="pt-2">
                   {detailsContent.faq!.map((item) => (
                     <div key={item.question} className="mb-3">
-                      <p className="font-medium text-neutral-900">{item.question}</p>
+                      <p className="text-[var(--ea-ink)]">{item.question}</p>
                       <p>{item.answer}</p>
                     </div>
                   ))}
@@ -268,15 +278,13 @@ export default function SiteRenderer({
       )}
 
       {showSuppliers && (
-        <section className="mx-auto max-w-2xl px-6 py-16">
-          <h2 className="mb-4 text-2xl font-semibold text-neutral-900">
-            {suppliersContent.heading || "Suppliers"}
-          </h2>
-          <ul className="space-y-3 text-neutral-700">
+        <section className={`mx-auto max-w-2xl ${sectionPad}`}>
+          <h2 className={`mb-4 ${heading}`}>{suppliersContent.heading || "Suppliers"}</h2>
+          <ul className="space-y-3 text-base text-[var(--ea-ink-secondary)]">
             {suppliers.map((s, i) => (
               <li key={i}>
-                <p className="font-medium text-neutral-900">{s.business_name}</p>
-                <p className="text-sm text-neutral-500">
+                <p className="text-[var(--ea-ink)]">{s.business_name}</p>
+                <p className="text-sm text-[var(--ea-ink-muted)]">
                   {s.category}
                   {s.contact_phone ? ` · ${s.contact_phone}` : ""}
                   {s.contact_email ? ` · ${s.contact_email}` : ""}
@@ -288,18 +296,18 @@ export default function SiteRenderer({
       )}
 
       {showEntourage && (
-        <section className="mx-auto max-w-3xl px-6 py-16">
-          <h2 className="mb-4 text-2xl font-semibold text-neutral-900">
-            {entourageContent.heading || "Our entourage"}
-          </h2>
+        <section className={`mx-auto max-w-3xl ${sectionPad}`}>
+          <h2 className={`mb-4 ${heading}`}>{entourageContent.heading || "Our entourage"}</h2>
           {entourageContent.intro && (
-            <p className="mb-6 text-neutral-700">{entourageContent.intro}</p>
+            <p className="mb-6 text-base text-[var(--ea-ink-secondary)]">
+              {entourageContent.intro}
+            </p>
           )}
           <div className="grid gap-6 sm:grid-cols-2">
             {entourageRolesInUse.map((role) => (
               <div key={role}>
-                <p className="font-medium text-neutral-900">{entourageRoleLabel(role)}</p>
-                <ul className="mt-1 space-y-0.5 text-neutral-700">
+                <p className="text-[var(--ea-ink)]">{entourageRoleLabel(role)}</p>
+                <ul className="mt-1 space-y-0.5 text-base text-[var(--ea-ink-secondary)]">
                   {entourageByRole.get(role)!.map((name) => (
                     <li key={name}>{name}</li>
                   ))}
@@ -311,7 +319,7 @@ export default function SiteRenderer({
       )}
 
       {showFooter && (
-        <footer className="border-t border-neutral-200 bg-white px-6 py-10 text-center text-sm text-neutral-500">
+        <footer className="border-t border-[var(--ea-border)] px-6 py-10 text-center text-sm text-[var(--ea-ink-muted)]">
           {footerContent.message}
         </footer>
       )}

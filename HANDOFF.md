@@ -21,13 +21,15 @@ four of M8's deferred minor findings. See §6 and §7 for detail. §10 covers
 the workflow this pass used, since it's a deliberate change from how
 M0–M8 were built.
 
-**2026-08-03, launch readiness: Parts 6 and 7 are both done, verified
-live, and merged**, alongside Parts 1, 2, 3, and 5 from 2026-08-02. Only
-Part 4 (guest-facing UI/UX pass) remains — deliberately last per the
-spec's own suggested order, so it styles every surface (including the
-new entourage site section and, in principle, any future printable UI)
-in one sweep rather than redoing it. §11 is the full writeup for Parts
-1/2/3/5; §12 covers Part 6; §13 covers Part 7.
+**2026-08-03, launch readiness: all seven parts are done, verified live,
+and merged.** Part 4 (guest-facing UI/UX pass) — the last one — restyled
+`/r/[token]/day`, `/r/[token]`, `/s/[slug]`, `/directory`, and
+`/invite/[token]` to the spec's design direction. §11 is the full
+writeup for Parts 1/2/3/5; §12 covers Part 6; §13 covers Part 7; §14
+covers Part 4. The launch-readiness spec is now fully implemented —
+what's left is genuinely new scope (Phase 2 features, real theming,
+etc.), not anything already scoped in
+`docs/ever-after-launch-readiness-spec.md`.
 
 ---
 
@@ -392,13 +394,11 @@ spec's revision history
 Everything that was fixable as a self-contained punch-list item was closed
 2026-08-02 (see §6's bug #5 and the "fixed" note below). The member-invite
 flow and token rotation gaps listed here previously are **closed** — see
-§11. What's left below is real feature scope — each one needs its own
-design/plan pass before implementation, not a quick patch.
+§11. The entire launch-readiness spec (Parts 1–7) is now done — see §14
+for the last one. What's left below is real feature scope beyond that
+spec — each one needs its own design/plan pass before implementation,
+not a quick patch.
 
-- **Guest-facing UI/UX pass (launch-readiness Part 4)** — not started.
-  The only remaining launch-readiness part. Deliberately last in the
-  spec's own order, so every surface built by Parts 1–3/5/6/7 gets styled
-  in one sweep instead of piecemeal.
 - **Physical print check for Part 7's printables** — still owed, same
   caveat Part 3 already recorded: no printer/camera has been available in
   any environment used for this project so far. A4 sizing and PDF
@@ -784,3 +784,98 @@ passes clean. **Still owed**: an actual physical print of the attendee
 sheet and place cards to confirm A4 margins/cut-lines for real — no
 printer available in this environment, same caveat Part 3 already
 recorded for its own QR print-and-scan test.
+
+---
+
+## 14. Launch-readiness spec — Part 4 (2026-08-03) — spec complete
+
+Guest-facing UI/UX pass, per `docs/ever-after-launch-readiness-spec.md`
+Part 4 — the last part of the spec, done deliberately last so it styles
+every surface built by Parts 1–3/5/6/7 in one sweep. Restyled: the
+day-of hub, the invitation/RSVP page, the public wedding site (via
+`SiteRenderer`), the vendor directory, and the member-invite acceptance
+page. **The entire launch-readiness spec is now implemented.**
+
+**Design was done in two passes, at the user's explicit request, before
+any app code was touched** — a deliberate change from every other part's
+workflow so far (plan → sign-off → implement directly). Two rounds of a
+static HTML mockup (Claude Artifact) were reviewed and iterated against
+the spec's exact tokens before writing a single line of real code:
+round 1 matched the spec literally (flat two-stop hero wash, no
+imagery); round 2 added a painterly hero-banner treatment with real
+scroll parallax, after the user asked for something less flat. The
+follow-up decision, made explicitly rather than assumed: **ship the
+banner art, drop the parallax motion** — real scroll-linked JS fights
+the spec's own "nothing that delays content" rule, and wasn't worth
+that tension for a v1 pass. Worth remembering for future design-heavy
+work: showing a mockup before writing code caught this tension while it
+was still cheap to resolve, instead of after a parallax implementation
+existed to un-write.
+
+**New shared theme layer, scoped to guest routes only:**
+- `src/lib/guest-fonts.ts` — PT Serif (400) + PT Sans (400/700) via
+  `next/font/google`, the same pair already bundled as TTFs for Part
+  3's invitation card, now also loaded as webfonts. **Real constraint
+  hit here**: PT Sans only ships 400/700 on Google Fonts, no 500 — the
+  spec's own type scale calls for weight 500 on the day-of hub's table
+  number specifically. Substituted 700 (documented in the file) rather
+  than silently picking a different, unspecified weight.
+- `src/app/globals.css` — a new `.ea-theme` class (never `:root`) with
+  all nine `--ea-*` tokens plus `.ea-hero-banner`/`__art`/`__arch`/
+  `__scrim` (the static painterly wash — see above) and `.ea-fade-in`
+  (300ms rise, gated behind `prefers-reduced-motion`).
+- Four new thin layouts — `src/app/r/layout.tsx`, `s/layout.tsx`,
+  `directory/layout.tsx`, `invite/layout.tsx` — each just apply the
+  `.ea-theme` class and the two font variables to their subtree.
+  `src/app/(app)/*` never gets this class; confirmed by direct
+  side-by-side screenshot during verification, logged in as both a
+  throwaway Account user and a throwaway couple user.
+
+**One deliberate exception to "`(app)/*` untouched"**: the read-only
+site preview inside `(app)/engagements/[id]/site/site-tab.tsx` gets a
+local `.ea-theme` wrapper around its `SiteRenderer` call, matching the
+public `s/[slug]` page. Reasoning: that preview's whole job, per the
+M5/M8 constraint already on record, is to render *identically* to the
+public site — leaving it unthemed would make the internal tool lie
+about what a couple's site actually looks like. Nothing else in that
+file, or anywhere else under `(app)/*`, changed. Verified live: the
+preview and the public page render pixel-identical hero banner, fonts,
+and section styling side by side.
+
+**`SiteRenderer`'s hero now actually reads `heroContent.image_url`**
+(a field that already existed and was already editable in the site
+editor, just never rendered as a background before this pass) — not a
+new feature, just finally using data that was already there. Falls back
+to the painterly wash when empty, matching the spec's own note that an
+empty hero "should look deliberate, not empty." Section-gating logic
+(`showStory`, `showTheDay`, etc.) is unchanged — presentation only, per
+the spec's own "no functional changes" constraint.
+
+**Two small content additions, both named in
+`docs/ever-after-template-spec.md` §6, both already flagged in the plan
+rather than slipped in silently:**
+- `getDayHubByToken` (`src/lib/guest-token.ts`) now returns
+  `weddingDate` in both the locked and unlocked branches, so the
+  locked-state message can state the actual date instead of just "check
+  back then." On investigation, the declined/no-reply guest's schedule
+  visibility turned out to **already** be correct — `hub.schedule`,
+  venue, and coordinator blocks were already siblings of the
+  accepted-only table card, not nested inside it, so non-accepted
+  guests already saw the schedule per §6's requirement. Only the
+  wording needed a pass, not new conditional logic — a smaller change
+  than the plan anticipated, worth noting since it's a case of the
+  exploration phase catching something before it became unnecessary
+  work.
+
+**Verified live**, at a 380px mobile viewport, real seed data:
+`npm run verify:guest-token` (18/18, unchanged — confirms this pass
+touched only presentation, not guest-token security logic);
+`npm run build` clean; RSVP flow (awaiting-reply, confirmed, and the
+locked/before-hub-unlocks state via an engagement with no `sites` row
+at all); day-of hub (unlocked+accepted with a real table number,
+unlocked+no-reply with the warm note and schedule still showing,
+locked-with-date); the public site (`/s/[slug]`) including a real
+`hero.image_url` background, the entourage/footer sections correctly
+rendering nothing since no data exists for them right now (empty-state
+discipline holding); `/directory`'s empty state; `/invite/[token]`'s
+invalid-token state. All throwaway test users cleaned up afterward.

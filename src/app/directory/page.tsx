@@ -36,17 +36,19 @@ export default async function DirectoryPage({
   const { data: vendors } = await query;
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-12">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="mx-auto max-w-4xl px-6 py-12 sm:py-[72px]">
+      <div className="mb-8 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Vendor directory</h1>
-          <p className="mt-1 text-sm text-neutral-500">
+          <h1 className="ea-font-serif text-[32px] leading-[1.2] text-[var(--ea-ink)]">
+            Vendor directory
+          </h1>
+          <p className="mt-1 text-sm text-[var(--ea-ink-secondary)]">
             Suppliers we&apos;ve worked with, or who&apos;ve applied to be listed.
           </p>
         </div>
         <Link
           href="/directory/apply"
-          className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          className="min-h-[44px] shrink-0 rounded-[10px] bg-[var(--ea-accent)] px-4 py-2.5 text-sm font-medium text-[#FFF8F5] hover:opacity-90"
         >
           List your business
         </Link>
@@ -56,7 +58,7 @@ export default async function DirectoryPage({
         <select
           name="category"
           defaultValue={category ?? ""}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
+          className="min-h-[44px] rounded-[10px] border border-[var(--ea-border)] bg-[var(--ea-canvas)] px-3 py-2 text-sm text-[var(--ea-ink)] focus:border-[var(--ea-accent)] focus:outline-none"
         >
           {CATEGORIES.map((c) => (
             <option key={c.value} value={c.value}>
@@ -66,7 +68,7 @@ export default async function DirectoryPage({
         </select>
         <button
           type="submit"
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+          className="min-h-[44px] rounded-[10px] border border-[var(--ea-border)] px-3 py-2 text-sm font-medium text-[var(--ea-ink)] hover:bg-[var(--ea-blush)]"
         >
           Filter
         </button>
@@ -79,32 +81,37 @@ export default async function DirectoryPage({
               (a, b) => a.sort_order - b.sort_order,
             );
             return (
-              <div key={vendor.id} className="rounded-lg border border-neutral-200 bg-white p-4">
+              <div
+                key={vendor.id}
+                className="rounded-[10px] border border-[var(--ea-border)] bg-[var(--ea-blush)] p-4"
+              >
                 {photos[0] && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={photos[0].photo_url}
                     alt=""
-                    className="mb-3 aspect-video w-full rounded-md object-cover"
+                    className="mb-3 aspect-video w-full rounded-[10px] object-cover"
                   />
                 )}
-                <div className="mb-1 flex items-center justify-between">
-                  <h3 className="font-medium text-neutral-900">{vendor.business_name}</h3>
-                  <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-700">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <h3 className="text-[var(--ea-ink)]">{vendor.business_name}</h3>
+                  <span className="shrink-0 rounded-full bg-[var(--ea-champagne)] px-2 py-0.5 text-xs font-medium text-[var(--ea-accent-ink)]">
                     {vendor.category}
                   </span>
                 </div>
                 {vendor.description && (
-                  <p className="mb-2 text-sm text-neutral-600">{vendor.description}</p>
+                  <p className="mb-2 text-sm text-[var(--ea-ink-secondary)]">
+                    {vendor.description}
+                  </p>
                 )}
                 {(vendor.rate_from || vendor.rate_to) && (
-                  <p className="text-sm text-neutral-500">
+                  <p className="text-sm text-[var(--ea-ink-muted)]">
                     {vendor.rate_from ? `From ${vendor.rate_from}` : ""}
                     {vendor.rate_to ? ` to ${vendor.rate_to}` : ""}
                     {vendor.rate_note ? ` — ${vendor.rate_note}` : ""}
                   </p>
                 )}
-                <div className="mt-2 text-sm text-neutral-500">
+                <div className="mt-2 text-sm text-[var(--ea-ink-muted)]">
                   {vendor.contact_phone && <p>{vendor.contact_phone}</p>}
                   {vendor.contact_email && <p>{vendor.contact_email}</p>}
                 </div>
@@ -113,7 +120,7 @@ export default async function DirectoryPage({
           })}
         </div>
       ) : (
-        <p className="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center text-sm text-neutral-500">
+        <p className="rounded-[10px] border border-dashed border-[var(--ea-border)] p-10 text-center text-sm text-[var(--ea-ink-muted)]">
           No vendors listed in this category yet.
         </p>
       )}
