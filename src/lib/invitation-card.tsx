@@ -1,7 +1,7 @@
 import "server-only";
 import QRCode from "qrcode";
 import { ImageResponse } from "next/og";
-import { COLORS, loadFonts, sanitizeFilenameSegment } from "./print-theme";
+import { COLORS as DEFAULT_COLORS, loadFonts, sanitizeFilenameSegment } from "./print-theme";
 
 // Ever After — Milestone/launch-readiness spec Part 3: the card is a
 // couple's first mailer, not a bare QR. One shared rendering path — the
@@ -30,11 +30,16 @@ export type InvitationCardInput = {
   weddingDate: string | null;
   ceremonyVenue: string | null;
   inviteUrl: string;
+  // The card is guest-facing and must match the couple's site theme
+  // (real per-couple theming) — defaults to the house palette so
+  // existing callers that don't pass one keep working unchanged.
+  colors?: typeof DEFAULT_COLORS;
 };
 
 export async function renderInvitationCardPng(
   input: InvitationCardInput,
 ): Promise<Buffer> {
+  const COLORS = input.colors ?? DEFAULT_COLORS;
   const { serif, sans } = await loadFonts();
 
   // Error correction level M (or higher) — printed cards get creased and

@@ -3,8 +3,9 @@ export const maxDuration = 60;
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { COLORS, sanitizeFilenameSegment, contentDisposition } from "@/lib/print-theme";
+import { sanitizeFilenameSegment, contentDisposition } from "@/lib/print-theme";
 import { renderPagePng, assemblePdf, PAGE_WIDTH, PAGE_HEIGHT } from "@/lib/printable-pdf";
+import { resolveAccentPreset } from "@/lib/site-themes";
 
 const CARDS_PER_PAGE = 10;
 const COLUMNS = 2;
@@ -45,6 +46,16 @@ export async function GET(
   }
 
   const tableLabel = new Map((tables ?? []).map((t) => [t.id, t.label]));
+
+  // Place cards follow the couple's site theme (unlike the other
+  // printables, which stay house palette) — per the launch-readiness
+  // spec's own split.
+  const { data: site } = await supabase
+    .from("sites")
+    .select("theme")
+    .eq("engagement_id", id)
+    .maybeSingle();
+  const COLORS = resolveAccentPreset(site?.theme ?? null).tokens;
 
   const pageCount = Math.ceil(guests.length / CARDS_PER_PAGE);
   const pages: Buffer[] = [];

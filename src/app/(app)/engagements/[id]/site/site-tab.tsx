@@ -12,16 +12,33 @@ import SiteRenderer, {
   type FooterContent,
 } from "@/components/site-renderer";
 import { ptSerif, ptSans } from "@/lib/guest-fonts";
+import { ACCENT_PRESETS, resolveAccentPreset } from "@/lib/site-themes";
 import {
   createSite,
   updateSiteSection,
   updateSiteSlug,
+  updateSiteTheme,
   publishSite,
   unpublishSite,
 } from "./actions";
 
 function find(sections: SiteSectionRow[], type: string) {
   return sections.find((s) => s.section_type === type);
+}
+
+function themeStyle(preset: ReturnType<typeof resolveAccentPreset>): React.CSSProperties {
+  const t = preset.tokens;
+  return {
+    "--ea-canvas": t.canvas,
+    "--ea-blush": t.blush,
+    "--ea-champagne": t.champagne,
+    "--ea-border": t.border,
+    "--ea-ink": t.ink,
+    "--ea-ink-secondary": t.inkSecondary,
+    "--ea-ink-muted": t.inkMuted,
+    "--ea-accent": t.accent,
+    "--ea-accent-ink": t.accentInk,
+  } as React.CSSProperties;
 }
 
 export default async function SiteTab({
@@ -51,7 +68,7 @@ export default async function SiteTab({
 
   const { data: site } = await supabase
     .from("sites")
-    .select("id, slug, status, published_at")
+    .select("id, slug, status, published_at, theme")
     .eq("engagement_id", engagementId)
     .maybeSingle();
 
@@ -131,6 +148,7 @@ export default async function SiteTab({
             class. */}
         <div
           className={`ea-theme ${ptSerif.variable} ${ptSans.variable} overflow-hidden rounded-lg border border-neutral-200`}
+          style={themeStyle(resolveAccentPreset(site.theme))}
         >
           <SiteRenderer
             sections={sections}
@@ -233,6 +251,51 @@ export default async function SiteTab({
           </p>
         )}
       </div>
+
+      {/* Theme — curated accent presets, no free color picker. Applies to
+          the wedding site, RSVP/day-of hub, the invitation card, and
+          place cards/table numbers. Internal tools and the vendor
+          directory/invite pages never follow this. */}
+      <form
+        action={updateSiteTheme}
+        className="rounded-lg border border-neutral-200 bg-white p-4"
+      >
+        <input type="hidden" name="engagement_id" value={engagementId} />
+        <input type="hidden" name="site_id" value={site.id} />
+        <h3 className="mb-4 font-medium text-neutral-900">Theme</h3>
+        <div className="grid grid-cols-4 gap-3">
+          {ACCENT_PRESETS.map((preset) => {
+            const selected = resolveAccentPreset(site.theme).key === preset.key;
+            return (
+              <label
+                key={preset.key}
+                className={`flex cursor-pointer flex-col items-center gap-2 rounded-md border p-3 text-center ${
+                  selected ? "border-neutral-900" : "border-neutral-200"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="accent"
+                  value={preset.key}
+                  defaultChecked={selected}
+                  className="sr-only"
+                />
+                <span
+                  className="h-8 w-8 rounded-full border border-black/10"
+                  style={{ backgroundColor: preset.tokens.accent }}
+                />
+                <span className="text-xs font-medium text-neutral-700">{preset.label}</span>
+              </label>
+            );
+          })}
+        </div>
+        <button
+          type="submit"
+          className="mt-4 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+        >
+          Save
+        </button>
+      </form>
 
       {/* Hero — always visible, cannot be hidden */}
       <form

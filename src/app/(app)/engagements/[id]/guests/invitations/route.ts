@@ -14,6 +14,7 @@ import {
   sanitizeFilenameSegment,
 } from "@/lib/invitation-card";
 import { contentDisposition } from "@/lib/print-theme";
+import { resolveAccentPreset } from "@/lib/site-themes";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -41,6 +42,13 @@ export async function GET(
     .is("archived_at", null)
     .order("full_name");
 
+  const { data: site } = await supabase
+    .from("sites")
+    .select("theme")
+    .eq("engagement_id", id)
+    .maybeSingle();
+  const colors = resolveAccentPreset(site?.theme ?? null).tokens;
+
   const zip = new JSZip();
   const usedNames = new Map<string, number>();
 
@@ -60,6 +68,7 @@ export async function GET(
           weddingDate: engagement.wedding_date,
           ceremonyVenue: engagement.ceremony_venue,
           inviteUrl: `${SITE_URL}/r/${guest.invite_token}`,
+          colors,
         }),
       ),
     );

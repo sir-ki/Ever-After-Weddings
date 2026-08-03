@@ -26,10 +26,16 @@ and merged.** Part 4 (guest-facing UI/UX pass) — the last one — restyled
 `/r/[token]/day`, `/r/[token]`, `/s/[slug]`, `/directory`, and
 `/invite/[token]` to the spec's design direction. §11 is the full
 writeup for Parts 1/2/3/5; §12 covers Part 6; §13 covers Part 7; §14
-covers Part 4. The launch-readiness spec is now fully implemented —
-what's left is genuinely new scope (Phase 2 features, real theming,
-etc.), not anything already scoped in
-`docs/ever-after-launch-readiness-spec.md`.
+covers Part 4. The launch-readiness spec is now fully implemented.
+
+**2026-08-03, post-launch-readiness: real per-couple theming shipped.**
+`sites.theme` — unwired since M5, still empty everywhere when Part 4
+shipped — now actually drives four curated accent presets across every
+themed surface (the site, RSVP, day-of hub, invitation card, place
+cards/table numbers), picked from a swatch UI in the site editor. §15
+has the full writeup. Accent color only — `heading_font` and
+`corner_style` (also named in the template spec) are a documented,
+additive-later fast-follow, not implemented yet.
 
 ---
 
@@ -879,3 +885,80 @@ locked-with-date); the public site (`/s/[slug]`) including a real
 rendering nothing since no data exists for them right now (empty-state
 discipline holding); `/directory`'s empty state; `/invite/[token]`'s
 invalid-token state. All throwaway test users cleaned up afterward.
+
+---
+
+## 15. Real per-couple theming (2026-08-03, post-launch-readiness)
+
+`sites.theme` (`jsonb`, `default '{}'`) existed since M5 and was still
+completely unread/unwritten anywhere in the codebase when Part 4
+shipped — confirmed by exploration before starting this. Every couple
+got the identical hardcoded palette Part 4 built. This wires up the
+accent half of what `docs/ever-after-template-spec.md` §4 describes.
+
+**Scope decision, made explicitly rather than silently expanding**:
+shipped **accent-color presets only**. `heading_font` (§4 also names
+this — "2-3 curated serif options") needs a second bundled TTF for
+print rendering, since `next/og`'s `ImageResponse` needs a raw font
+buffer, not a webfont — real sourcing risk for comparatively small
+payoff next to the color work, so it's deferred as a documented
+fast-follow. `corner_style` (`soft`/`sharp`) would touch every
+`rounded-[10px]` instance across all five Part-4-restyled files for a
+purely cosmetic toggle — deferred too. `sites.theme` stores
+`{ accent: "<preset-key>" }` for now; `src/lib/site-themes.ts`'s types
+are shaped so both fields are additive later, not a rework.
+
+**Four presets** (`src/lib/site-themes.ts`): Blush (the existing
+default, unchanged), Sage, Dusty Blue, Amber. Every preset reuses the
+exact same canvas/ink/ink-secondary/ink-muted/border as the default —
+already AA-verified, and the template spec's "muted accents" language
+implies the neutral base doesn't move — only `blush`/`champagne`/
+`accent`/`accent-ink` vary. Contrast ratios were computed with the real
+WCAG relative-luminance formula (a throwaway Node script, not
+eyeballed) and iteratively darkened until every preset cleared
+white-on-accent ≥4.5:1 and accent-ink-on-canvas ≥6:1 — matching the
+default's own margin, not just scraping the AA floor.
+
+**Site editor**: a new "Theme" section in `site-tab.tsx` (Account-only,
+swatch buttons — no free color picker, per the spec's own instruction),
+a new `updateSiteTheme` action in `site/actions.ts` writing
+`{ accent: key }` straight onto `sites.theme`.
+
+**Wired into every surface the spec's Part 4 table marks "themed:
+yes"**: `src/app/r/layout.tsx` and `s/layout.tsx` moved to
+`r/[token]/layout.tsx` / `s/[slug]/layout.tsx` specifically so they
+could read their own route param and resolve the engagement's actual
+preset (previously impossible — a layout above the dynamic segment has
+no access to it). `src/lib/guest-token.ts` gained `getThemeByToken()`
+for this. Resolved tokens are applied as inline CSS custom properties
+on the existing `.ea-theme` wrapper — the class stays for structural
+rules, the inline style is what actually varies per engagement. The
+site-tab preview picked up the same treatment (it already had the
+`.ea-theme` class from Part 4; this just adds the per-engagement
+override). `directory/layout.tsx` and `invite/layout.tsx` are
+**untouched** — those stay on the class's own fixed default forever,
+per the spec's explicit "No" row for those two surfaces.
+
+**Print surfaces**: `renderInvitationCardPng()` (`src/lib/
+invitation-card.tsx`) now takes an optional `colors` param (defaults to
+the house palette, so nothing broke for any caller that doesn't pass
+one) — both of its routes (`guests/[guestId]/invitation`,
+`guests/invitations` bulk zip) now look up the engagement's `sites.theme`
+and pass the resolved preset through. Same pattern in the
+`printables/table-numbers` and `printables/place-cards` routes. Every
+other printable (attendee sheet, call sheet, both CSVs, processional
+order) is **untouched** — internal documents stay house palette always,
+per the spec's own explicit split, which the original Part 7 pass
+already anticipated by keeping `printable-pdf.tsx`'s shared helpers
+palette-agnostic.
+
+**Verified live**: set Maria & Jon to Dusty Blue via the new Theme
+picker, confirmed the color actually changed on `/s/[slug]` (hero
+countdown text, "The day" section fill), `/r/[token]/day` (table card,
+announcement fill), a downloaded invitation-card PNG (QR block, guest
+name), and that `place-cards`/`table-numbers` PDFs still generate
+(200 OK) with the new theme wired in. Confirmed `/directory` did
+**not** change color across this — the spec's own "No" row holding.
+Reset back to the default afterward so Maria & Jon's live site isn't
+left in a test state. `npm run verify:guest-token` (18/18, unchanged)
+and `npm run build` both clean.

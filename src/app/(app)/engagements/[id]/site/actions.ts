@@ -242,6 +242,17 @@ export async function updateSiteSection(formData: FormData) {
   revalidatePath(`/engagements/${engagementId}`);
 }
 
+export async function updateSiteTheme(formData: FormData) {
+  const engagementId = formData.get("engagement_id") as string;
+  const siteId = formData.get("site_id") as string;
+  const accent = formData.get("accent") as string;
+
+  const supabase = await createClient();
+  await supabase.from("sites").update({ theme: { accent } }).eq("id", siteId);
+
+  revalidatePath(`/engagements/${engagementId}`);
+}
+
 export async function updateSiteSlug(formData: FormData) {
   const engagementId = formData.get("engagement_id") as string;
   const siteId = formData.get("site_id") as string;

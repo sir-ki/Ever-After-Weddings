@@ -3,8 +3,9 @@ export const maxDuration = 60;
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { COLORS, sanitizeFilenameSegment, contentDisposition } from "@/lib/print-theme";
+import { sanitizeFilenameSegment, contentDisposition } from "@/lib/print-theme";
 import { renderPagePng, assemblePdf, PAGE_WIDTH, PAGE_HEIGHT } from "@/lib/printable-pdf";
+import { resolveAccentPreset } from "@/lib/site-themes";
 
 export async function GET(
   _request: Request,
@@ -32,6 +33,16 @@ export async function GET(
   if (!tables?.length) {
     return NextResponse.json({ error: "No tables to print." }, { status: 400 });
   }
+
+  // Table numbers follow the couple's site theme (unlike the other
+  // printables, which stay house palette) — per the launch-readiness
+  // spec's own split.
+  const { data: site } = await supabase
+    .from("sites")
+    .select("theme")
+    .eq("engagement_id", id)
+    .maybeSingle();
+  const COLORS = resolveAccentPreset(site?.theme ?? null).tokens;
 
   const pages = await Promise.all(
     tables.map((table) =>

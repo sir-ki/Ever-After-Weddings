@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "./supabase/admin";
+import { resolveAccentPreset } from "./site-themes";
 
 // The highest-risk surface in the system: a token is a bearer
 // credential held by an anonymous guest, not a logged-in session. Every
@@ -80,6 +81,32 @@ export async function getGuestByToken(
       rsvp_deadline: engagement.rsvp_deadline,
     },
   };
+}
+
+// Layout-level lookup for real per-couple theming: guest token ->
+// engagement -> sites.theme. Never throws and never leaks anything
+// beyond a preset choice — an invalid token just resolves to the
+// default preset, same as any other site with no theme set, since the
+// page itself is responsible for the real 404.
+export async function getThemeByToken(token: string) {
+  if (!token || token.length < 16) return resolveAccentPreset(null);
+
+  const supabase = createAdminClient();
+  const { data: guest } = await supabase
+    .from("guests")
+    .select("engagement_id")
+    .eq("invite_token", token)
+    .maybeSingle();
+
+  if (!guest) return resolveAccentPreset(null);
+
+  const { data: site } = await supabase
+    .from("sites")
+    .select("theme")
+    .eq("engagement_id", guest.engagement_id)
+    .maybeSingle();
+
+  return resolveAccentPreset(site?.theme ?? null);
 }
 
 export function isPastDeadline(rsvpDeadline: string | null): boolean {
