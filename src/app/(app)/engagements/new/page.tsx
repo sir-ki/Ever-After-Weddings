@@ -21,7 +21,7 @@ export default async function NewEngagementPage({
     .single();
 
   if (profile?.global_role !== "account") {
-    redirect("/");
+    redirect("/dashboard");
   }
 
   const { data: accountUsers } = await supabase

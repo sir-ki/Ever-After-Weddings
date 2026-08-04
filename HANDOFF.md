@@ -48,6 +48,12 @@ are a documented fast-follow, not built. Vendor photos are untouched
 (still pasted URLs, a prior deliberate M8-era scope call, not
 re-litigated here).
 
+**2026-08-04: the public marketing site shipped.** Five new pages —
+`/`, `/how-it-works`, `/pricing`, `/vendors`, `/contact` — the front
+door in front of the product, per `docs/ever-after-marketing-site-plan.md`.
+`/` moved from the dashboard to the marketing homepage; the dashboard
+is now `/dashboard`. §17 has the full writeup.
+
 ---
 
 ## 1. Live pieces
@@ -1057,3 +1063,111 @@ still owed: an actual click-through of the upload buttons in a real
 browser, first chance someone has one with file-picker access. `npm run
 build` clean; `verify-rls.mjs` extended with 3 new `media` isolation
 checks (47 total, all passing).
+
+---
+
+## 17. Marketing site (2026-08-04)
+
+The public front door, per `docs/ever-after-marketing-site-plan.md` —
+anonymous visitors, no auth, no data, whose only jobs are to explain the
+product and hand people to `/login` or an enquiry. Same Next.js app, new
+public routes, same design tokens — not a second project. Design
+reference: `design_handoff_ever_after/Ever After.dc.html` (an internal
+HTML prototyping format, not shippable code — copy, colors, spacing,
+and behavior were ported by hand into real components against this
+codebase's own conventions).
+
+**Five new pages** under a new `src/app/(marketing)/` route group:
+`/` (home), `/how-it-works`, `/pricing`, `/vendors`, `/contact`.
+`/vendors` here is the public supplier pitch page (why list, benefits,
+apply) — distinct from `/directory`, the existing public vendor
+listing (launch-readiness Part 6), which it links out to.
+
+**`/` changed meaning — the biggest structural change.** It used to be
+the authenticated dashboard (`(app)/page.tsx`). That's now
+`(app)/dashboard/page.tsx`, and every internal link/redirect that
+pointed at `/` (`(app)/layout.tsx`'s wordmark, `login/actions.ts`'s
+post-sign-in redirect, engagement-list "Clear" links, the "back to
+engagements" breadcrumb, a couple of Account-only-route guards) was
+repointed to `/dashboard`. `src/lib/supabase/middleware.ts` gained a
+`user && pathname === "/"` check that redirects a signed-in visitor to
+`/dashboard` before the marketing route ever renders for them — an
+anonymous visitor sees the marketing homepage, per the plan's own
+"signed-in users hitting `/` should be sent to their dashboard rather
+than shown a sales pitch."
+
+**Route collision, caught before it broke anything**: the plan's own
+sitemap names `/vendors` for the public pitch page, but
+`(app)/vendors` already existed — the Account-only vendor-approval
+queue from M8. Renamed that internal route to `(app)/vendor-approvals`
+(directory rename + its two `redirect("/")` calls + the layout's nav
+link) so the two `/vendors` don't fight over the same URL.
+
+**Marketing routes are public in the middleware**, alongside the
+existing `/r/`, `/s/`, `/directory`, `/invite/` carve-outs — `"/"`,
+`/how-it-works`, `/pricing`, `/vendors`, `/contact` are all reachable
+with no session.
+
+**New theme layer, `.mkt-theme` (`globals.css`), scoped to
+`(marketing)/layout.tsx` only** — same `--ea-*` color values every
+other themed surface defaults to (this site has no engagement to
+resolve a per-couple theme from), but its own fonts: Newsreader/Sora
+(`src/lib/marketing-fonts.ts`), not the guest-facing PT Serif/PT Sans.
+Deliberately a different pair — the marketing site is the front door
+before a visitor ever reaches the product, not required to match the
+in-product identity pixel-for-pixel.
+
+**Scroll effects, ported from the design reference's rAF-based
+approach rather than pulled in as a library** — no new dependency
+earns its weight for six sections' worth of motion. Four small client
+components under `src/components/marketing/`:
+- `reveal.tsx` — fade-and-rise on scroll-into-view via
+  `IntersectionObserver`. Reduced motion is handled entirely by CSS
+  (`.mkt-reveal`'s `@media (prefers-reduced-motion: reduce)` override
+  forces the settled state) — no JS branch needed.
+- `parallax.tsx` — the layered hero/promise depth, transform-only,
+  same continuous-rAF-reading-`getBoundingClientRect()` technique the
+  design reference uses. Disabled under reduced motion and below the
+  plan's own 880px breakpoint (checked via `matchMedia` in the
+  effect, since this one can't be pure CSS).
+- `count-up.tsx` — the pricing-figure animation, `IntersectionObserver`
+  triggered, cubic ease-out. Reduced motion jumps straight to target.
+- `how-it-works-timeline.tsx` — the sticky two-column layout, active
+  step tracked via `IntersectionObserver` with a centered root margin
+  band, rather than the reference's per-frame distance calculation.
+
+**Real bug caught live, not in review: `position: sticky` silently
+broke.** The how-it-works sticky pane never stuck — it scrolled away
+with the page. Root cause, found by walking the ancestor chain in a
+live browser session (`getComputedStyle` per ancestor, not just
+reading the JSX): `(marketing)/layout.tsx`'s root wrapper had
+`overflow-x-hidden` (added for the hero's off-edge decorative ring),
+and any ancestor with `overflow` off `visible` on either axis becomes
+the containing block sticky measures against — silently breaking it
+even though the div was never meant to scroll internally. Fixed two
+ways: moved `overflow-x-hidden` down to just the hero section that
+actually needs it (`(marketing)/page.tsx`), and split the sticky
+pane's own wrapper into an outer grid item (stretches to the tall row
+by default) and an inner sticky div (what actually pins) —
+`self-start`/`h-fit` directly on the sticky element collapses its own
+containing block to content height, which independently breaks
+sticking even with the overflow fix. Verified live by scrolling
+through all seven steps and checking the pane updates.
+
+**Photography**: every image is `PlaceholderImage`
+(`src/components/marketing/placeholder-image.tsx`) — the striped-box
+plus monospace-caption pattern from the design reference, sized and
+positioned where a real photo drops in later. No stock photography
+used, per the brand brief. The one real content gap the plan itself
+calls out unresolved: no real wedding photos, no testimonial (the
+testimonial section is deliberately a dashed-border placeholder, not
+invented), and the Contact page's Facebook link is still the
+placeholder name-search URL from the design reference (no vanity URL
+was ever provided).
+
+**Verified live**: all five pages, both desktop (1440×900) and mobile
+(390×844, hamburger menu open/close), `/dashboard` still correctly
+redirects an anonymous visitor to `/login`, `npm run build` clean.
+`verify-rls.mjs`/`verify-guest-token.mjs` untouched by this pass — no
+RLS or guest-token surface was touched, this is presentation and
+routing only.

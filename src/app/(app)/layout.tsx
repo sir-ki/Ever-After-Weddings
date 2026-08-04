@@ -28,12 +28,12 @@ export default async function AppLayout({
     <div className="min-h-screen bg-neutral-50">
       <header className="border-b border-neutral-200 bg-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-          <Link href="/" className="text-sm font-semibold text-neutral-900">
+          <Link href="/dashboard" className="text-sm font-semibold text-neutral-900">
             Ever After
           </Link>
           <div className="flex items-center gap-4">
             {profile?.global_role === "account" && (
-              <Link href="/vendors" className="text-sm text-neutral-500 hover:text-neutral-900">
+              <Link href="/vendor-approvals" className="text-sm text-neutral-500 hover:text-neutral-900">
                 Vendors
               </Link>
             )}

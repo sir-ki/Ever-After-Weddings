@@ -127,3 +127,81 @@ body {
     transform: translateY(0);
   }
 }
+
+/* ---------------------------------------------------------------------
+ * Marketing site tokens (docs/ever-after-marketing-site-plan.md).
+ * Scoped to a `.mkt-theme` class, applied only by
+ * src/app/(marketing)/layout.tsx. Same `--ea-*` colour values every
+ * other themed surface defaults to (this site has no couple/engagement
+ * to resolve a theme from), but its own font variables — Newsreader/Sora,
+ * not the guest-facing PT Serif/PT Sans.
+ * ------------------------------------------------------------------ */
+.mkt-theme {
+  --ea-canvas: #FDFAF7;
+  --ea-blush: #F9EFEA;
+  --ea-champagne: #F2E4DA;
+  --ea-border: #E8DAD2;
+  --ea-ink: #3D2E2B;
+  --ea-ink-secondary: #6B5551;
+  --ea-ink-muted: #7E6663;
+  --ea-accent: #A85D5B;
+  --ea-accent-ink: #8E4A48;
+
+  background: var(--ea-canvas);
+  color: var(--ea-ink);
+  font-family: var(--font-mkt-sans), sans-serif;
+}
+
+.mkt-font-serif {
+  font-family: var(--font-mkt-serif), serif;
+}
+
+/* Fade-and-rise scroll reveal. The reduced-motion override forces the
+ * settled state regardless of the JS-toggled .is-visible class, so
+ * Reveal's IntersectionObserver never needs its own reduced-motion
+ * branch — CSS alone guarantees content renders fully visible. */
+.mkt-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.mkt-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mkt-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* Photo placeholder — striped box + monospace caption, per the design
+ * reference. Real photography drops in later (README's own framing);
+ * nothing about this pattern is meant to ship long-term. */
+.mkt-placeholder {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 10px;
+  border: 1px solid var(--ea-border);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--ea-champagne),
+    var(--ea-champagne) 10px,
+    var(--ea-blush) 10px,
+    var(--ea-blush) 20px
+  );
+}
+
+.mkt-placeholder__caption {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--ea-ink-muted);
+  padding: 0 16px;
+}

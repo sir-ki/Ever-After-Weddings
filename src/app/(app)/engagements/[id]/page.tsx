@@ -92,7 +92,7 @@ export default async function EngagementWorkspacePage({
   return (
     <div>
       <div className="mb-6">
-        <Link href="/" className="text-sm text-neutral-500 hover:underline">
+        <Link href="/dashboard" className="text-sm text-neutral-500 hover:underline">
           ← Engagements
         </Link>
         <div className="mt-2 flex items-center justify-between">

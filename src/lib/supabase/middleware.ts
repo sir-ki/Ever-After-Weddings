@@ -42,7 +42,25 @@ export async function updateSession(request: NextRequest) {
   // still gets their session cookies here to preview a draft.
   // /invite/ is anonymous invite acceptance — the token is the
   // credential, not a session, same as /r/.
+  // The marketing site (docs/ever-after-marketing-site-plan.md) — anonymous
+  // visitors, no auth, no data. "/" doubles as both the marketing homepage
+  // and (for a signed-in user) the entry point to the app, so it gets its
+  // own redirect below rather than folding into isPublicRoute.
+  const isMarketingRoute =
+    request.nextUrl.pathname === "/" ||
+    request.nextUrl.pathname.startsWith("/how-it-works") ||
+    request.nextUrl.pathname.startsWith("/pricing") ||
+    request.nextUrl.pathname.startsWith("/vendors") ||
+    request.nextUrl.pathname.startsWith("/contact");
+
+  if (user && request.nextUrl.pathname === "/") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
+
   const isPublicRoute =
+    isMarketingRoute ||
     request.nextUrl.pathname.startsWith("/r/") ||
     request.nextUrl.pathname.startsWith("/api/g/") ||
     request.nextUrl.pathname.startsWith("/s/") ||
@@ -61,7 +79,7 @@ export async function updateSession(request: NextRequest) {
 
   if (user && request.nextUrl.pathname === "/login") {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 

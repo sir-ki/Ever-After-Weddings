@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Ever After",
-  description: "Internal dashboard for Ever After Weddings.",
+  description: "Ever After Weddings.",
 };
 
 export default function RootLayout({

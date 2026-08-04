@@ -16,7 +16,7 @@ async function requireAccount() {
     .eq("id", user!.id)
     .single();
   if (profile?.global_role !== "account") {
-    redirect("/");
+    redirect("/dashboard");
   }
   return { supabase, userId: user!.id };
 }

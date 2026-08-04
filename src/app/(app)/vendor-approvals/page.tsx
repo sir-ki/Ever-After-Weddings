@@ -177,7 +177,7 @@ export default async function VendorReviewPage({
     .single();
 
   if (profile?.global_role !== "account") {
-    redirect("/");
+    redirect("/dashboard");
   }
 
   const { data: vendors } = await supabase
