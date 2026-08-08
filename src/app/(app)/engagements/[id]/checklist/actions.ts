@@ -25,6 +25,7 @@ export async function addChecklistItem(formData: FormData) {
     weeks_before: formData.get("weeks_before") ? Number(formData.get("weeks_before")) : null,
     due_date: (formData.get("due_date") as string) || null,
     notes: (formData.get("notes") as string) || null,
+    link_target: (formData.get("link_target") as string) || null,
     sort_order: count ?? 0,
   });
 
@@ -44,6 +45,7 @@ export async function updateChecklistItem(formData: FormData) {
       weeks_before: formData.get("weeks_before") ? Number(formData.get("weeks_before")) : null,
       due_date: (formData.get("due_date") as string) || null,
       notes: (formData.get("notes") as string) || null,
+      link_target: (formData.get("link_target") as string) || null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
@@ -126,7 +128,7 @@ export async function addChecklistItemsFromTemplate(formData: FormData) {
   const [{ data: template }, { data: existing }] = await Promise.all([
     supabase
       .from("checklist_templates")
-      .select("title, category, notes, owner, weeks_before, sort_order")
+      .select("title, category, notes, owner, weeks_before, sort_order, link_target")
       .eq("is_active", true),
     supabase.from("checklist_items").select("title").eq("engagement_id", engagementId),
   ]);
@@ -143,6 +145,7 @@ export async function addChecklistItemsFromTemplate(formData: FormData) {
         notes: t.notes,
         owner: t.owner,
         weeks_before: t.weeks_before,
+        link_target: t.link_target,
         sort_order: t.sort_order,
       })),
     );

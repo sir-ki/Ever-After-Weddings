@@ -38,7 +38,7 @@ export async function createEngagement(formData: FormData) {
   // failure shouldn't block engagement creation.
   const { data: template } = await supabase
     .from("checklist_templates")
-    .select("title, category, notes, owner, weeks_before, sort_order")
+    .select("title, category, notes, owner, weeks_before, sort_order, link_target")
     .eq("is_active", true);
 
   if (template?.length) {
@@ -50,6 +50,7 @@ export async function createEngagement(formData: FormData) {
         notes: t.notes,
         owner: t.owner,
         weeks_before: t.weeks_before,
+        link_target: t.link_target,
         sort_order: t.sort_order,
       })),
     );

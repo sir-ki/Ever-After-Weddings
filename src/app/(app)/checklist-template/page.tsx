@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { CHECKLIST_CATEGORIES, CHECKLIST_OWNERS, checklistCategoryLabel } from "@/lib/checklist";
+import {
+  CHECKLIST_CATEGORIES,
+  CHECKLIST_OWNERS,
+  CHECKLIST_LINK_TARGETS,
+  checklistCategoryLabel,
+} from "@/lib/checklist";
 import {
   addTemplateItem,
   updateTemplateItem,
@@ -20,6 +25,7 @@ type TemplateRow = {
   notes: string | null;
   owner: string;
   weeks_before: number | null;
+  link_target: string | null;
   sort_order: number;
   is_active: boolean;
 };
@@ -42,7 +48,7 @@ export default async function ChecklistTemplatePage() {
 
   const { data: rowsRaw } = await supabase
     .from("checklist_templates")
-    .select("id, title, category, notes, owner, weeks_before, sort_order, is_active")
+    .select("id, title, category, notes, owner, weeks_before, link_target, sort_order, is_active")
     .order("sort_order");
 
   const rows = (rowsRaw ?? []) as TemplateRow[];
@@ -115,7 +121,22 @@ export default async function ChecklistTemplatePage() {
                         className={inputClass}
                       />
                     </div>
-                    <div className="col-span-3">
+                    <div>
+                      <label className={labelClass}>Links to</label>
+                      <select
+                        name="link_target"
+                        defaultValue={item.link_target ?? ""}
+                        className={inputClass}
+                      >
+                        <option value="">—</option>
+                        {CHECKLIST_LINK_TARGETS.map((t) => (
+                          <option key={t.value} value={t.value}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-2">
                       <label className={labelClass}>Notes</label>
                       <input name="notes" type="text" defaultValue={item.notes ?? ""} className={inputClass} />
                     </div>
@@ -200,6 +221,14 @@ export default async function ChecklistTemplatePage() {
                 className={inputClass}
                 style={{ width: 120 }}
               />
+              <select name="link_target" defaultValue="" className={inputClass} style={{ width: 150 }}>
+                <option value="">Links to…</option>
+                {CHECKLIST_LINK_TARGETS.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
               <button
                 type="submit"
                 className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800"

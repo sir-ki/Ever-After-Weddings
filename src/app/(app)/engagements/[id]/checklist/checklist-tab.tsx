@@ -1,9 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
 import {
   CHECKLIST_CATEGORIES,
   CHECKLIST_OWNERS,
+  CHECKLIST_LINK_TARGETS,
   checklistCategoryLabel,
   resolveDueDate,
+  resolveLinkTarget,
   dueState,
   type ChecklistItem,
   type DueState,
@@ -53,7 +56,7 @@ export default async function ChecklistTab({
     supabase
       .from("checklist_items")
       .select(
-        "id, title, category, notes, owner, weeks_before, due_date, completed_at, completed_by, sort_order",
+        "id, title, category, notes, owner, weeks_before, due_date, completed_at, completed_by, sort_order, link_target",
       )
       .eq("engagement_id", engagementId)
       .order("sort_order"),
@@ -265,7 +268,22 @@ export default async function ChecklistTab({
                           className={inputClass}
                         />
                       </div>
-                      <div className="col-span-2">
+                      <div>
+                        <label className={labelClass}>Links to</label>
+                        <select
+                          name="link_target"
+                          defaultValue={item.link_target ?? ""}
+                          className={inputClass}
+                        >
+                          <option value="">—</option>
+                          {CHECKLIST_LINK_TARGETS.map((t) => (
+                            <option key={t.value} value={t.value}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
                         <label className={labelClass}>Notes</label>
                         <input
                           name="notes"
@@ -286,9 +304,22 @@ export default async function ChecklistTab({
                   </div>
 
                   <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-3 text-sm">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${DUE_STYLES[state]}`}>
-                      {formatDate(resolved)}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${DUE_STYLES[state]}`}>
+                        {formatDate(resolved)}
+                      </span>
+                      {(() => {
+                        const link = resolveLinkTarget(item.link_target);
+                        return link ? (
+                          <Link
+                            href={link.href(engagementId)}
+                            className="text-xs text-neutral-500 hover:text-neutral-900 hover:underline"
+                          >
+                            {link.label} →
+                          </Link>
+                        ) : null;
+                      })()}
+                    </div>
                     <div className="flex items-center gap-3 text-neutral-500">
                       <form action={moveChecklistItem}>
                         <input type="hidden" name="engagement_id" value={engagementId} />
@@ -359,6 +390,14 @@ export default async function ChecklistTab({
                 className={inputClass}
                 style={{ width: 120 }}
               />
+              <select name="link_target" defaultValue="" className={inputClass} style={{ width: 150 }}>
+                <option value="">Links to…</option>
+                {CHECKLIST_LINK_TARGETS.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
               <button
                 type="submit"
                 className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800"

@@ -21,6 +21,37 @@ export const CHECKLIST_OWNERS = [
   { value: "shared", label: "Shared" },
 ] as const;
 
+// Where a checklist item can point (spec §8). Keys are the engagement
+// workspace's own tab keys, so a target resolves to
+// /engagements/{id}?tab={key} — see resolveLinkTarget below. Kept in
+// sync by hand with the TABS array in
+// (app)/engagements/[id]/page.tsx; an unknown or stale value renders no
+// link rather than a broken one, so drift degrades quietly.
+export const CHECKLIST_LINK_TARGETS = [
+  { value: "guests", label: "Guest List" },
+  { value: "tables", label: "Tables & Seating" },
+  { value: "website", label: "Website" },
+  { value: "day-of", label: "Day-of Hub" },
+  { value: "checkpoints", label: "Checkpoints" },
+  { value: "vendors", label: "Vendors" },
+  { value: "people", label: "People" },
+  { value: "entourage", label: "Entourage" },
+  { value: "printables", label: "Printables" },
+] as const;
+
+// Returns null for null/unknown targets, so a stale value left behind by
+// a renamed tab silently drops its link instead of linking nowhere.
+export function resolveLinkTarget(
+  linkTarget: string | null,
+): { href: (engagementId: string) => string; label: string } | null {
+  const match = CHECKLIST_LINK_TARGETS.find((t) => t.value === linkTarget);
+  if (!match) return null;
+  return {
+    href: (engagementId: string) => `/engagements/${engagementId}?tab=${match.value}`,
+    label: match.label,
+  };
+}
+
 export type ChecklistItem = {
   id: string;
   title: string;
@@ -32,6 +63,7 @@ export type ChecklistItem = {
   completed_at: string | null;
   completed_by: string | null;
   sort_order: number;
+  link_target: string | null;
 };
 
 // Explicit due_date always wins (a user overrode a specific item).

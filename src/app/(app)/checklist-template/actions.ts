@@ -42,6 +42,7 @@ export async function addTemplateItem(formData: FormData) {
     owner: (formData.get("owner") as string) || "couple",
     weeks_before: formData.get("weeks_before") ? Number(formData.get("weeks_before")) : null,
     notes: (formData.get("notes") as string) || null,
+    link_target: (formData.get("link_target") as string) || null,
     sort_order: count ?? 0,
   });
 
@@ -59,6 +60,7 @@ export async function updateTemplateItem(formData: FormData) {
       owner: (formData.get("owner") as string) || "couple",
       weeks_before: formData.get("weeks_before") ? Number(formData.get("weeks_before")) : null,
       notes: (formData.get("notes") as string) || null,
+      link_target: (formData.get("link_target") as string) || null,
     })
     .eq("id", id);
 
