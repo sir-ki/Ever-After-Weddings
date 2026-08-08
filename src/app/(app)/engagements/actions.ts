@@ -32,5 +32,28 @@ export async function createEngagement(formData: FormData) {
     );
   }
 
+  // Seed the checklist from the active template — a copy, not a link, so
+  // editing the template later never mutates a live engagement's list
+  // (docs/ever-after-checklist-spec.md §2). Best-effort: a template read
+  // failure shouldn't block engagement creation.
+  const { data: template } = await supabase
+    .from("checklist_templates")
+    .select("title, category, notes, owner, weeks_before, sort_order")
+    .eq("is_active", true);
+
+  if (template?.length) {
+    await supabase.from("checklist_items").insert(
+      template.map((t) => ({
+        engagement_id: data.id,
+        title: t.title,
+        category: t.category,
+        notes: t.notes,
+        owner: t.owner,
+        weeks_before: t.weeks_before,
+        sort_order: t.sort_order,
+      })),
+    );
+  }
+
   redirect(`/engagements/${data.id}`);
 }

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "node --env-file=.env.local scripts/seed.mjs",
+    "seed:checklist-template": "node --env-file=.env.local scripts/seed-checklist-template.mjs",
     "verify:rls": "node --env-file=.env.local scripts/verify-rls.mjs",
     "verify:guest-token": "node --env-file=.env.local scripts/verify-guest-token-security.mjs",
     "verify:invitation-card": "node --env-file=.env.local scripts/verify-invitation-card.mjs",

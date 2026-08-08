@@ -1105,6 +1105,93 @@ try {
   await admin.auth.admin.deleteUser(couple6UserId);
 }
 
+// Planning checklist (docs/ever-after-checklist-spec.md): checklist_items
+// gets a real couple-write policy (unlike engagements, which is
+// Account-only for every column) — same single for-all shape as media/
+// processional_entries/tables. checklist_templates is global and
+// Account-write, couple-read-only.
+const { data: mariaJonItem } = await admin
+  .from("checklist_items")
+  .insert({ engagement_id: mariaJon.id, title: "RLS test item (M&J)", category: "final_week" })
+  .select("id")
+  .single();
+const { data: erickErikaItem } = await admin
+  .from("checklist_items")
+  .insert({ engagement_id: erickErika.id, title: "RLS test item (E&E)", category: "final_week" })
+  .select("id")
+  .single();
+
+const couple7Email = `rls-test-couple7-${Date.now()}@example.com`;
+const couple7Password = "verify-rls-temp-password-1234";
+const { data: created7, error: create7Error } = await admin.auth.admin.createUser({
+  email: couple7Email,
+  password: couple7Password,
+  email_confirm: true,
+  user_metadata: { full_name: "RLS Test Couple 7" },
+});
+if (create7Error) {
+  console.error("Failed to create seventh test couple:", create7Error.message);
+  process.exit(1);
+}
+const couple7UserId = created7.user.id;
+await admin.from("engagement_members").insert({
+  engagement_id: mariaJon.id,
+  user_id: couple7UserId,
+  role: "partner",
+});
+
+try {
+  const asCouple7 = createClient(url, anonKey);
+  const { error: signIn7Error } = await asCouple7.auth.signInWithPassword({
+    email: couple7Email,
+    password: couple7Password,
+  });
+  if (signIn7Error) {
+    console.error("Failed to sign in as seventh test couple:", signIn7Error.message);
+    process.exit(1);
+  }
+
+  const { data: visibleItems } = await asCouple7.from("checklist_items").select("id, engagement_id");
+  const visibleItemIds = new Set(visibleItems?.map((i) => i.id));
+  check(
+    "couple's checklist is scoped to their own engagement",
+    visibleItems?.every((i) => i.engagement_id === mariaJon.id) &&
+      visibleItemIds.has(mariaJonItem.id) &&
+      !visibleItemIds.has(erickErikaItem.id),
+  );
+
+  const { error: crossItemInsertError } = await asCouple7.from("checklist_items").insert({
+    engagement_id: erickErika.id,
+    title: "should not be allowed",
+    category: "final_week",
+  });
+  check("couple cannot add a checklist item to another engagement", crossItemInsertError !== null);
+
+  const { data: ownItemUpdate, error: ownItemUpdateError } = await asCouple7
+    .from("checklist_items")
+    .update({ completed_at: new Date().toISOString() })
+    .eq("id", mariaJonItem.id)
+    .select("id")
+    .maybeSingle();
+  check(
+    "couple CAN complete their own checklist item",
+    !ownItemUpdateError && !!ownItemUpdate,
+  );
+
+  const { data: templateForCouple } = await asCouple7.from("checklist_templates").select("id");
+  check("couple can read the checklist template", Array.isArray(templateForCouple));
+
+  const { error: templateWriteError } = await asCouple7
+    .from("checklist_templates")
+    .insert({ title: "should not be allowed", category: "final_week" });
+  check("couple cannot write to the checklist template", templateWriteError !== null);
+} finally {
+  await admin.from("checklist_items").delete().eq("id", mariaJonItem.id);
+  await admin.from("checklist_items").delete().eq("id", erickErikaItem.id);
+  await admin.from("engagement_members").delete().eq("user_id", couple7UserId);
+  await admin.auth.admin.deleteUser(couple7UserId);
+}
+
 const secondAccountEmail = `rls-test-account-${Date.now()}@example.com`;
 const secondAccountPassword = "verify-rls-temp-password-1234";
 

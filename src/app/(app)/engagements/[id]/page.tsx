@@ -10,6 +10,7 @@ import VendorsTab from "./vendors/vendors-tab";
 import PeopleTab from "./people/people-tab";
 import EntourageTab from "./entourage/entourage-tab";
 import PrintablesTab from "./printables/printables-tab";
+import ChecklistTab from "./checklist/checklist-tab";
 import { updateGuestCap, updateLivestream } from "./actions";
 
 const TABS = [
@@ -23,6 +24,7 @@ const TABS = [
   { key: "people", label: "People" },
   { key: "entourage", label: "Entourage" },
   { key: "printables", label: "Printables" },
+  { key: "checklist", label: "Checklist" },
 ] as const;
 
 const STAGE_LABELS: Record<string, string> = {
@@ -54,11 +56,13 @@ export default async function EngagementWorkspacePage({
     archived?: string;
     error?: string;
     page?: string;
+    owner?: string;
+    category?: string;
   }>;
 }) {
   const { id } = await params;
   const resolvedSearchParams = await searchParams;
-  const { tab = "overview", error } = resolvedSearchParams;
+  const { tab = "overview", error, owner, category, status } = resolvedSearchParams;
   const supabase = await createClient();
 
   const { data: engagement } = await supabase
@@ -263,6 +267,8 @@ export default async function EngagementWorkspacePage({
         <EntourageTab engagementId={id} />
       ) : activeTab.key === "printables" ? (
         <PrintablesTab engagementId={id} />
+      ) : activeTab.key === "checklist" ? (
+        <ChecklistTab engagementId={id} searchParams={{ owner, status, category }} />
       ) : null}
     </div>
   );
