@@ -243,7 +243,13 @@ export async function updateSiteSection(formData: FormData) {
 }
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+// 20MB — raised from the media library's original 8MB cap to
+// comfortably fit full-res prenup photography straight from a
+// photographer, without going so high that upload/page-load time on
+// Philippine mobile data (the marketing plan's own stated constraint)
+// gets painful. No resizing/compression happens anywhere in this
+// pipeline — whatever's uploaded is served as-is.
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 
 // Real per-couple photo uploads (media library, post-launch-readiness).
 // Account/couple uploads only this pass — no guest-upload moderation
@@ -260,7 +266,7 @@ async function uploadToMediaLibrary(
     return { error: "Please upload a JPEG, PNG, or WebP image." };
   }
   if (file.size > MAX_IMAGE_BYTES) {
-    return { error: "Images must be 8MB or smaller." };
+    return { error: "Images must be 20MB or smaller." };
   }
 
   const {
