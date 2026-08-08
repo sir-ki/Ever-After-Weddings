@@ -25,7 +25,7 @@ export default async function PublicSitePage({
   const { data: engagement } = site
     ? await createAdminClient()
         .from("engagements")
-        .select("display_name, wedding_date")
+        .select("display_name, wedding_date, livestream_url, livestream_starts_at, livestream_note")
         .eq("id", site.engagement_id)
         .maybeSingle()
     : { data: null };
@@ -87,6 +87,9 @@ export default async function PublicSitePage({
         weddingDate={engagement.wedding_date}
         suppliers={suppliers ?? []}
         entourage={entourage ?? []}
+        livestreamUrl={engagement.livestream_url}
+        livestreamStartsAt={engagement.livestream_starts_at}
+        livestreamNote={engagement.livestream_note}
       />
     </>
   );

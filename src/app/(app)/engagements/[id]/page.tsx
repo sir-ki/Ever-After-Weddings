@@ -10,7 +10,7 @@ import VendorsTab from "./vendors/vendors-tab";
 import PeopleTab from "./people/people-tab";
 import EntourageTab from "./entourage/entourage-tab";
 import PrintablesTab from "./printables/printables-tab";
-import { updateGuestCap } from "./actions";
+import { updateGuestCap, updateLivestream } from "./actions";
 
 const TABS = [
   { key: "overview", label: "Overview" },
@@ -64,7 +64,7 @@ export default async function EngagementWorkspacePage({
   const { data: engagement } = await supabase
     .from("engagements")
     .select(
-      "id, display_name, partner_a_name, partner_b_name, wedding_date, stage, ceremony_venue, reception_venue, expected_guest_count, guest_cap, assigned_to_profile:users!engagements_assigned_to_fkey(full_name)",
+      "id, display_name, partner_a_name, partner_b_name, wedding_date, stage, ceremony_venue, reception_venue, expected_guest_count, guest_cap, livestream_url, livestream_starts_at, livestream_note, assigned_to_profile:users!engagements_assigned_to_fkey(full_name)",
     )
     .eq("id", id)
     .single();
@@ -125,6 +125,12 @@ export default async function EngagementWorkspacePage({
       </div>
 
       {activeTab.key === "overview" ? (
+        <>
+        {error && (
+          <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
         <dl className="grid grid-cols-2 gap-x-8 gap-y-4 rounded-lg border border-neutral-200 bg-white p-6 text-sm">
           <div>
             <dt className="text-neutral-500">Partner A</dt>
@@ -187,7 +193,54 @@ export default async function EngagementWorkspacePage({
               <dd className="mt-1 text-neutral-900">{engagement.guest_cap}</dd>
             )}
           </div>
+          <div className="col-span-2">
+            <dt className="text-neutral-500">Livestream</dt>
+            {isAccount ? (
+              <dd className="mt-1">
+                <form action={updateLivestream} className="space-y-2">
+                  <input type="hidden" name="engagement_id" value={id} />
+                  <input
+                    name="livestream_url"
+                    type="text"
+                    placeholder="https://facebook.com/... or https://youtube.com/..."
+                    defaultValue={engagement.livestream_url ?? ""}
+                    className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm focus:border-neutral-500 focus:outline-none"
+                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      name="livestream_starts_at"
+                      type="time"
+                      defaultValue={engagement.livestream_starts_at ?? ""}
+                      className="rounded-md border border-neutral-300 px-2 py-1 text-sm focus:border-neutral-500 focus:outline-none"
+                    />
+                    <input
+                      name="livestream_note"
+                      type="text"
+                      placeholder="Optional note (e.g. you may need to log in to Facebook)"
+                      defaultValue={engagement.livestream_note ?? ""}
+                      className="flex-1 rounded-md border border-neutral-300 px-2 py-1 text-sm focus:border-neutral-500 focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-neutral-300 px-2 py-1 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </form>
+                <p className="mt-1 text-xs text-neutral-400">
+                  Shown on the day-of hub and public site, hidden until a link is set. Time is
+                  local to the venue.
+                </p>
+              </dd>
+            ) : (
+              <dd className="mt-1 text-neutral-900">
+                {engagement.livestream_url || "—"}
+              </dd>
+            )}
+          </div>
         </dl>
+        </>
       ) : activeTab.key === "guests" ? (
         <GuestListTab
           engagementId={id}

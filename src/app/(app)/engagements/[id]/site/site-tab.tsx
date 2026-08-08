@@ -65,7 +65,7 @@ export default async function SiteTab({
 
   const { data: engagement } = await supabase
     .from("engagements")
-    .select("display_name, wedding_date")
+    .select("display_name, wedding_date, livestream_url, livestream_starts_at, livestream_note")
     .eq("id", engagementId)
     .single();
 
@@ -159,6 +159,9 @@ export default async function SiteTab({
             weddingDate={engagement?.wedding_date ?? null}
             suppliers={creditedSuppliers ?? []}
             entourage={entourageMembers ?? []}
+            livestreamUrl={engagement?.livestream_url ?? null}
+            livestreamStartsAt={engagement?.livestream_starts_at ?? null}
+            livestreamNote={engagement?.livestream_note ?? null}
           />
         </div>
       </div>

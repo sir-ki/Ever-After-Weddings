@@ -27,6 +27,9 @@ export type PublicEngagement = {
   reception_address: string | null;
   reception_time: string | null;
   rsvp_deadline: string | null;
+  livestream_url: string | null;
+  livestream_starts_at: string | null;
+  livestream_note: string | null;
 };
 
 export type GuestTokenLookup = {
@@ -48,7 +51,7 @@ export async function getGuestByToken(
   const { data: guest } = await supabase
     .from("guests")
     .select(
-      "id, full_name, rsvp_status, contact_phone, guest_notes, meal_choice, song_request, archived_at, engagements(id, display_name, wedding_date, ceremony_venue, ceremony_address, ceremony_time, reception_venue, reception_address, reception_time, rsvp_deadline, archived_at)",
+      "id, full_name, rsvp_status, contact_phone, guest_notes, meal_choice, song_request, archived_at, engagements(id, display_name, wedding_date, ceremony_venue, ceremony_address, ceremony_time, reception_venue, reception_address, reception_time, rsvp_deadline, livestream_url, livestream_starts_at, livestream_note, archived_at)",
     )
     .eq("invite_token", token)
     .maybeSingle();
@@ -79,6 +82,9 @@ export async function getGuestByToken(
       reception_address: engagement.reception_address,
       reception_time: engagement.reception_time,
       rsvp_deadline: engagement.rsvp_deadline,
+      livestream_url: engagement.livestream_url,
+      livestream_starts_at: engagement.livestream_starts_at,
+      livestream_note: engagement.livestream_note,
     },
   };
 }
@@ -132,6 +138,7 @@ export type DayHub = {
     reception_address: string | null;
   };
   coordinator: { name: string; phone: string } | null;
+  livestream: { url: string; startsAt: string | null; note: string | null } | null;
 };
 
 // The day-of hub: guest-visible schedule, the "right now" announcement,
@@ -170,6 +177,7 @@ export async function getDayHubByToken(token: string): Promise<DayHub | null> {
         reception_address: null,
       },
       coordinator: null,
+      livestream: null,
     };
   }
 
@@ -231,5 +239,12 @@ export async function getDayHubByToken(token: string): Promise<DayHub | null> {
       reception_address: base.engagement.reception_address,
     },
     coordinator,
+    livestream: base.engagement.livestream_url
+      ? {
+          url: base.engagement.livestream_url,
+          startsAt: base.engagement.livestream_starts_at,
+          note: base.engagement.livestream_note,
+        }
+      : null,
   };
 }

@@ -78,12 +78,18 @@ export default function SiteRenderer({
   weddingDate,
   suppliers,
   entourage,
+  livestreamUrl = null,
+  livestreamStartsAt = null,
+  livestreamNote = null,
 }: {
   sections: SiteSectionRow[];
   fallbackHeadline: string;
   weddingDate: string | null;
   suppliers: SupplierCredit[];
   entourage: EntourageMember[];
+  livestreamUrl?: string | null;
+  livestreamStartsAt?: string | null;
+  livestreamNote?: string | null;
 }) {
   const byType = new Map(sections.map((s) => [s.section_type, s]));
 
@@ -211,6 +217,29 @@ export default function SiteRenderer({
                 <p className="text-sm text-[var(--ea-ink-muted)]">{theDayContent.travel_note}</p>
               )}
             </div>
+          </div>
+        </section>
+      )}
+
+      {livestreamUrl && (
+        <section className={`mx-auto max-w-2xl text-center ${sectionPad}`}>
+          <div className="rounded-[10px] border border-[var(--ea-accent)] bg-[var(--ea-blush)] p-6">
+            <p className="text-xs tracking-wide text-[var(--ea-accent-ink)] lowercase">
+              watching from afar?
+            </p>
+            <p className={`mt-2 ${heading}`}>
+              <a href={livestreamUrl} target="_blank" rel="noreferrer">
+                Watch the livestream
+              </a>
+            </p>
+            {livestreamStartsAt && (
+              <p className="mt-1 text-sm text-[var(--ea-ink-secondary)]">
+                Starts {formatTime(livestreamStartsAt)}
+              </p>
+            )}
+            {livestreamNote && (
+              <p className="mt-2 text-sm text-[var(--ea-ink-muted)]">{livestreamNote}</p>
+            )}
           </div>
         </section>
       )}

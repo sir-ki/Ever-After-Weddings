@@ -92,6 +92,27 @@ export default async function DayHubPage({
           </div>
         )}
 
+        {hub.livestream && (
+          <a
+            href={hub.livestream.url}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-[10px] border border-[var(--ea-accent)] bg-[var(--ea-blush)] px-4 py-4"
+          >
+            <p className="text-[11px] tracking-wide text-[var(--ea-accent-ink)] lowercase">
+              watch the livestream
+            </p>
+            <p className="mt-1 text-[15px] text-[var(--ea-ink)]">
+              {hub.livestream.startsAt
+                ? `Starts ${formatTime(hub.livestream.startsAt)}`
+                : "Tap to open the stream"}
+            </p>
+            {hub.livestream.note && (
+              <p className="mt-1 text-xs text-[var(--ea-ink-muted)]">{hub.livestream.note}</p>
+            )}
+          </a>
+        )}
+
         {hub.announcement && (
           <div className="rounded-[10px] bg-[var(--ea-accent)] px-4 py-4 text-[#FFF8F5]">
             <p className="text-[11px] tracking-wide opacity-85 lowercase">right now</p>
