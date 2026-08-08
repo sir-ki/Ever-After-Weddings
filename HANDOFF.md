@@ -1274,11 +1274,10 @@ mutates a live engagement's list, per the spec's own instruction.
 
 **Not built this pass, per the spec's own explicit scope**: amounts/
 payment tracking, guest visibility, notifications, task dependencies,
-subtasks — all deliberately out (spec §1). No template-editing UI
-either — `checklist_templates` is written to today only via the seed
-script or direct SQL; a real Account-facing template editor is a
-clean addition later; the schema and RLS (Account read/write, couple
-read-only) already support it.
+subtasks — all deliberately out (spec §1).
+
+**A template-editing UI followed immediately after** (still
+2026-08-04) — see §20.
 
 **Verified live** against Maria & Jon as a throwaway Account user (no
 saved password for the real login, same pattern §8/§11/§12 already
@@ -1293,3 +1292,41 @@ persists in Maria & Jon's live engagement. `npm run build` clean;
 scoped to their own engagement, cross-engagement insert blocked,
 couple CAN complete their own item, couple can read but not write the
 template (52 total, all passing).
+
+---
+
+## 20. Checklist template editor (2026-08-04)
+
+The gap §19 left open, closed same day: a real Account-facing UI for
+`checklist_templates`, at a new global (not per-engagement) route,
+`/checklist-template` — same shape as `/vendor-approvals`, gated the
+same way (route-level `global_role === "account"` redirect to
+`/dashboard`, belt-and-suspenders on top of the RLS that already
+blocks a couple's write at the database layer, confirmed by §19's own
+`verify-rls.mjs` checks).
+
+**Deactivate, not delete.** Every mutation goes through
+`(app)/checklist-template/actions.ts`: add, edit, reorder (same
+swap-with-neighbor idiom as `checklist_items`/`processional_entries`),
+and toggle `is_active`. No hard-delete action exists — a template row
+removed from future engagements shouldn't retroactively look like it
+never existed when someone's later trying to work out why an older
+engagement has an item a newer one doesn't. `createEngagement` and
+`addChecklistItemsFromTemplate` (§19) already only ever copy
+`is_active` rows, so deactivating is functionally identical to
+deletion for anything going forward.
+
+**Nav link**: a new "Checklist template" link in `(app)/layout.tsx`'s
+header, Account-only, alongside the existing "Vendors" link.
+
+**Verified live** as a throwaway Account user (same pattern as every
+prior pass — no saved password for the real login): confirmed the
+seeded 55-row template renders grouped by category, deactivated then
+reactivated a row (active count updated 10 → 9 → 10, row visibly
+greyed while inactive), added a test row and confirmed it landed in
+the right category, moved it up one position and confirmed the order
+actually changed, then deleted the test row directly (no delete UI,
+by design — used the service client) and the throwaway user. `npm run
+build` clean. No RLS changes this pass — `checklist_templates`' policies
+were already written correctly in `0016_checklist.sql` and already
+covered by §19's `verify-rls.mjs` checks.

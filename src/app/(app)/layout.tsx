@@ -37,6 +37,11 @@ export default async function AppLayout({
                 Vendors
               </Link>
             )}
+            {profile?.global_role === "account" && (
+              <Link href="/checklist-template" className="text-sm text-neutral-500 hover:text-neutral-900">
+                Checklist template
+              </Link>
+            )}
             <Link
               href="/profile"
               className="text-sm text-neutral-500 hover:text-neutral-900"
