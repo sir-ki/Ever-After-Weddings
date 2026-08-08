@@ -54,6 +54,16 @@ door in front of the product, per `docs/ever-after-marketing-site-plan.md`.
 `/` moved from the dashboard to the marketing homepage; the dashboard
 is now `/dashboard`. §17 has the full writeup.
 
+**2026-08-04: livestream link and the planning checklist shipped**,
+per `docs/ever-after-checklist-spec.md`. Livestream (§18) is a small
+link-out field set on `engagements`, rendered on the day-of hub and
+public site when set. The checklist (§19) is the bigger piece — a
+shared per-engagement task list seeded from a global template, with a
+new Checklist tab (progress summary, filters, inline edit, reorder,
+add-from-template). Unlike every other `engagements`-level field,
+`checklist_items` is a brand-new table with a real couple-write RLS
+policy, not an Account-only one.
+
 ---
 
 ## 1. Live pieces
@@ -1171,3 +1181,115 @@ redirects an anonymous visitor to `/login`, `npm run build` clean.
 `verify-rls.mjs`/`verify-guest-token.mjs` untouched by this pass — no
 RLS or guest-token surface was touched, this is presentation and
 routing only.
+
+---
+
+## 18. Livestream link (2026-08-04)
+
+`docs/ever-after-checklist-spec.md`'s appendix — a small, separate
+feature specified alongside the checklist because it's genuinely one
+field and two render locations. `engagements` gains `livestream_url`,
+`livestream_starts_at` (local `time`, same convention as
+`ceremony_time`), `livestream_note` (migration `0015_livestream.sql`).
+Link-out only — no hosting, no embedding; the couple's own Facebook/
+YouTube/Zoom link is stored and linked to.
+
+**Account-only edit, a deliberate deviation from the spec's own
+"Account and couple" framing.** `engagements` has no couple-write RLS
+path for *any* column today (`engagements_write_account`, migration
+`0001_init.sql` — confirmed live by `verify-rls.mjs`'s existing
+"couple cannot write to engagements" check) — `guest_cap`, the only
+other engagement-level field with an edit form, is Account-only for
+the same reason. Adding a livestream-specific RLS carve-out for one
+field wasn't worth diverging from that existing pattern; the edit form
+lives on the Overview tab, gated the same way `guest_cap`'s is.
+
+**Renders on the day-of hub** (`/r/[token]/day`, above the schedule,
+via `getDayHubByToken` in `src/lib/guest-token.ts`) **and the public
+site** (`/s/[slug]` and the Account/couple site-tab preview, via new
+optional props on `SiteRenderer`) — hidden entirely when unset, per
+the template spec's empty-state discipline. Visible to a guest
+regardless of RSVP status, same as the rest of the day-of hub's venue/
+schedule content — a declined guest is exactly the one most likely to
+want the stream.
+
+**Verified live** against Maria & Jon: wrote the fields via the
+service-role client (no UI file-picker friction here, unlike the media
+library — this is plain text/time inputs), confirmed both
+`/s/mariaandjon` and the day-of hub (via a real guest token) render
+the block, then reset the engagement so nothing persists from the
+test. `npm run build` clean. No RLS or guest-token *logic* changed
+(new columns on an already-covered table/query), so `verify-rls.mjs`
+wasn't extended for this one.
+
+---
+
+## 19. Planning checklist (2026-08-04)
+
+`docs/ever-after-checklist-spec.md` — the real gap the spec calls out:
+the platform covered the wedding *day* well and the months before it
+barely at all. A shared per-engagement task list now fills that
+stretch. Two new tables (migration `0016_checklist.sql`):
+`checklist_items` (per-engagement) and `checklist_templates` (global,
+Account-managed, seeded once via `scripts/seed-checklist-template.mjs`
+— idempotent, 55 rows from the spec's own §5 content, run with `npm
+run seed:checklist-template`).
+
+**`checklist_items` gets a real couple-write RLS policy** — unlike
+`engagements` (§18 above), this is a brand-new table with no legacy
+Account-only constraint to inherit, so `checklist_items_all` is one
+`for all` policy (`is_account() or has_engagement(engagement_id)`),
+same shape as `tables_all`/`processional_entries_all`. Couples
+genuinely add, edit, complete, reorder and delete their own items,
+matching the spec's own requirement — the deviation §18 needed doesn't
+apply here.
+
+**Due dates resolve live, not stored.** `resolveDueDate()`
+(`src/lib/checklist.ts`) computes a due date from `weeks_before` +
+`engagements.wedding_date` at render time; an explicit `due_date`
+override always wins. This turned out to make the spec's own "shift
+all dates" bulk-action requirement need **no per-item writes at all**
+— every `weeks_before`-based item already re-resolves the moment
+`wedding_date` changes, and overrides are untouched by that
+computation, which is exactly "moving the date shifts every computed
+date, overrides hold." The only real gap was that `wedding_date` had
+no edit UI anywhere in the app before this — that edit form (Account-
+only, same RLS reasoning as §18) now lives at the top of the new
+Checklist tab, which is what actually needed to exist for the spec's
+requirement to be true.
+
+**New Checklist tab** (`(app)/engagements/[id]/checklist/`): grouped
+by category, a progress summary (completed/total, overdue count),
+owner/status/category filters via query params, inline add per
+category, always-visible edit-in-place rows, up/down reorder within a
+category (`sort_order` swap, same idiom as the entourage tab's
+processional reorder), and "add items from template" (diffs by title
+against what the engagement already has, so a deliberately-deleted
+item doesn't come back).
+
+**New engagements auto-seed from the active template**
+(`(app)/engagements/actions.ts`'s `createEngagement`) — a copy at
+creation time, not a link, so editing the template later never
+mutates a live engagement's list, per the spec's own instruction.
+
+**Not built this pass, per the spec's own explicit scope**: amounts/
+payment tracking, guest visibility, notifications, task dependencies,
+subtasks — all deliberately out (spec §1). No template-editing UI
+either — `checklist_templates` is written to today only via the seed
+script or direct SQL; a real Account-facing template editor is a
+clean addition later; the schema and RLS (Account read/write, couple
+read-only) already support it.
+
+**Verified live** against Maria & Jon as a throwaway Account user (no
+saved password for the real login, same pattern §8/§11/§12 already
+establish): seeded 55 items from the template through the actual UI
+button, confirmed overdue/soon/open due-date badges render correctly
+against today's date, toggled one item complete (progress counter
+updated 0/55 → 1/55, category counter updated), exercised the overdue
+filter (`?status=overdue` correctly narrowed 55 rows to exactly the
+15 still-overdue ones), then deleted every test item so nothing
+persists in Maria & Jon's live engagement. `npm run build` clean;
+`verify-rls.mjs` extended with 5 new checks — couple's checklist
+scoped to their own engagement, cross-engagement insert blocked,
+couple CAN complete their own item, couple can read but not write the
+template (52 total, all passing).
