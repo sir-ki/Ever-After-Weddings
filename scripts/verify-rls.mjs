@@ -1192,6 +1192,105 @@ try {
   await admin.auth.admin.deleteUser(couple7UserId);
 }
 
+// Budget tracking (0018_budget.sql): same single for-all policy shape as
+// checklist_items. Financial data, so the isolation check matters more
+// than most — one engagement's spend must never be visible to another.
+const { data: mariaJonBudget } = await admin
+  .from("budget_items")
+  .insert({
+    engagement_id: mariaJon.id,
+    category: "venue",
+    label: "RLS test line (M&J)",
+    estimated_amount: 100000,
+  })
+  .select("id")
+  .single();
+const { data: erickErikaBudget } = await admin
+  .from("budget_items")
+  .insert({
+    engagement_id: erickErika.id,
+    category: "venue",
+    label: "RLS test line (E&E)",
+    estimated_amount: 250000,
+  })
+  .select("id")
+  .single();
+
+const couple8Email = `rls-test-couple8-${Date.now()}@example.com`;
+const couple8Password = "verify-rls-temp-password-1234";
+const { data: created8, error: create8Error } = await admin.auth.admin.createUser({
+  email: couple8Email,
+  password: couple8Password,
+  email_confirm: true,
+  user_metadata: { full_name: "RLS Test Couple 8" },
+});
+if (create8Error) {
+  console.error("Failed to create eighth test couple:", create8Error.message);
+  process.exit(1);
+}
+const couple8UserId = created8.user.id;
+await admin.from("engagement_members").insert({
+  engagement_id: mariaJon.id,
+  user_id: couple8UserId,
+  role: "partner",
+});
+
+try {
+  const asCouple8 = createClient(url, anonKey);
+  const { error: signIn8Error } = await asCouple8.auth.signInWithPassword({
+    email: couple8Email,
+    password: couple8Password,
+  });
+  if (signIn8Error) {
+    console.error("Failed to sign in as eighth test couple:", signIn8Error.message);
+    process.exit(1);
+  }
+
+  const { data: visibleBudget } = await asCouple8
+    .from("budget_items")
+    .select("id, engagement_id");
+  const visibleBudgetIds = new Set(visibleBudget?.map((b) => b.id));
+  check(
+    "couple's budget is scoped to their own engagement",
+    visibleBudget?.every((b) => b.engagement_id === mariaJon.id) &&
+      visibleBudgetIds.has(mariaJonBudget.id) &&
+      !visibleBudgetIds.has(erickErikaBudget.id),
+  );
+
+  const { data: otherBudgetFetch } = await asCouple8
+    .from("budget_items")
+    .select("id, estimated_amount")
+    .eq("id", erickErikaBudget.id)
+    .maybeSingle();
+  check(
+    "couple cannot read another engagement's budget line by id",
+    otherBudgetFetch === null,
+  );
+
+  const { error: crossBudgetInsertError } = await asCouple8.from("budget_items").insert({
+    engagement_id: erickErika.id,
+    category: "venue",
+    label: "should not be allowed",
+  });
+  check("couple cannot add a budget line to another engagement", crossBudgetInsertError !== null);
+
+  const { data: ownBudgetUpdate, error: ownBudgetUpdateError } = await asCouple8
+    .from("budget_items")
+    .update({ paid_amount: 50000 })
+    .eq("id", mariaJonBudget.id)
+    .select("id")
+    .maybeSingle();
+  check(
+    "couple CAN record a payment on their own budget line",
+    !ownBudgetUpdateError && !!ownBudgetUpdate,
+  );
+} finally {
+  await admin.from("budget_items").delete().eq("id", mariaJonBudget.id);
+  await admin.from("budget_items").delete().eq("id", erickErikaBudget.id);
+  await admin.from("engagement_members").delete().eq("user_id", couple8UserId);
+  await admin.auth.admin.deleteUser(couple8UserId);
+}
+
 const secondAccountEmail = `rls-test-account-${Date.now()}@example.com`;
 const secondAccountPassword = "verify-rls-temp-password-1234";
 

@@ -11,6 +11,7 @@ import PeopleTab from "./people/people-tab";
 import EntourageTab from "./entourage/entourage-tab";
 import PrintablesTab from "./printables/printables-tab";
 import ChecklistTab from "./checklist/checklist-tab";
+import BudgetTab from "./budget/budget-tab";
 import { updateGuestCap, updateLivestream } from "./actions";
 
 const TABS = [
@@ -25,6 +26,7 @@ const TABS = [
   { key: "entourage", label: "Entourage" },
   { key: "printables", label: "Printables" },
   { key: "checklist", label: "Checklist" },
+  { key: "budget", label: "Budget" },
 ] as const;
 
 const STAGE_LABELS: Record<string, string> = {
@@ -269,6 +271,8 @@ export default async function EngagementWorkspacePage({
         <PrintablesTab engagementId={id} />
       ) : activeTab.key === "checklist" ? (
         <ChecklistTab engagementId={id} searchParams={{ owner, status, category }} />
+      ) : activeTab.key === "budget" ? (
+        <BudgetTab engagementId={id} error={error} />
       ) : null}
     </div>
   );

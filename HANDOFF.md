@@ -1333,3 +1333,110 @@ by design — used the service client) and the throwaway user. `npm run
 build` clean. No RLS changes this pass — `checklist_templates`' policies
 were already written correctly in `0016_checklist.sql` and already
 covered by §19's `verify-rls.mjs` checks.
+
+---
+
+## 21. Checklist item deep links (2026-08-04)
+
+Closes the checklist spec's own §8 open question — "should a checklist
+item link to the thing it's about?" A nullable `link_target` column on
+`checklist_items` and `checklist_templates` (migration
+`0017_checklist_links.sql`) holds an engagement workspace tab key,
+rendered as a "Printables →" link on each item.
+
+**Free text, resolved defensively.** `CHECKLIST_LINK_TARGETS` and
+`resolveLinkTarget()` (`src/lib/checklist.ts`) map a target to
+`/engagements/{id}?tab={key}` — an unknown or stale value (a tab
+renamed later, say) resolves to `null` and the item just renders with
+no link, rather than a broken one. Kept in sync by hand with the
+`TABS` array in `(app)/engagements/[id]/page.tsx`.
+
+**25 of the 55 template rows got a link**; church/civil documents and
+attire fittings stay unlinked, since that work happens entirely
+off-platform and a link would only mislead. Both the Checklist tab
+and the template editor (§20) got a matching "Links to" field.
+
+**The seed script backfills, doesn't just insert.**
+`scripts/seed-checklist-template.mjs` already skipped existing rows by
+title — since the whole template was seeded before this column
+existed, a plain re-run would leave every row's `link_target` null
+forever. Added a second pass that sets `link_target` only where it's
+currently null, so a deliberate edit made in the template editor
+survives a re-run.
+
+**A real deploy hiccup, not a bug**: the first attempt at running
+`0017_checklist_links.sql` reported success in the SQL Editor but
+PostgREST's `select` still 42703'd on `link_target` — a genuine "the
+DDL didn't actually take" rather than a schema-cache staleness issue
+(confirmed by querying the column directly, twice, a few minutes
+apart). Re-running the same migration a second time fixed it. Worth
+remembering: a clean SQL Editor run isn't proof the schema changed —
+check with a real `select` against the column before trusting it.
+
+**Verified live** against Maria & Jon as a throwaway Account user:
+seeded from template through the UI, confirmed 25 of 55 items carried
+a correct `?tab=` href, clicked one through and landed on the
+Printables tab with real content rendering, confirmed the template
+editor showed the backfilled values, re-ran the seed script and
+confirmed it was a true no-op the second time. Test items deleted
+after. `npm run build` clean; `npm run verify:rls` still 52/52 (no
+policy changes this pass — new column on an already-covered table).
+
+---
+
+## 22. Budget tracking (2026-08-04)
+
+Named in the PRD's own Phase 1 scope ("Planner, budget & entourage",
+a "Budget/Planner" workspace tab) and deliberately kept out of the
+planning checklist by that spec's own §1 ("budget tracking is a
+different feature... it will swallow this one if allowed in"). This
+is that different feature. New table, `budget_items` (migration
+`0018_budget.sql`): category, label, an optional link to a supplier
+already logged in `engagement_vendors`, estimated/actual/paid amounts,
+and a next-payment due date.
+
+**RLS is the same shape as `checklist_items`, not `engagements`.**
+Real couple read/write (`budget_items_all`, one `for all` policy) —
+it's the couple's own money, a budget they can't see is barely a
+feature, and (unlike `engagements`) this is a brand-new table with no
+Account-only legacy to inherit. Nothing here has any guest-facing or
+public-site path; no token route touches this table.
+
+**One running `paid_amount`, not a payments table** — an explicit
+scope call, made with the user before building: Filipino weddings
+(and Ever After's own terms) are near-universally deposit-then-
+balance, so per-payment history (who paid what, when, by what method)
+earns less than a second table/RLS-policy/nested-UI would cost here.
+`next_payment_due` covers the question that actually gets asked
+("what's due next"). A real payments table is additive later if this
+ever needs a real audit trail.
+
+**"Committed" is actual where known, else the estimate**
+(`committedAmount()`, `src/lib/budget.ts`) — the summary strip's
+total stays honest before everything's booked, without a couple
+having to duplicate a figure from Estimated into Actual once a
+supplier's confirmed.
+
+**Amounts go through the same `parseOptionalRate` helper** the vendor
+directory forms already use (`src/lib/parse-rate.ts`) — a typo'd
+figure is a visible redirect-with-error, never a silently-dropped
+`null`, matching the discipline the M8 minor-findings fix (§7)
+established for vendor rates.
+
+**"Mark paid in full"** sets `paid_amount` to whatever the line item
+actually costs and clears `next_payment_due` — saves retyping a
+figure that's already on the row once a balance is settled.
+
+**Verified live** against Maria & Jon as a throwaway Account user:
+added a line item (venue, ₱250,000 estimated / ₱260,000 actual /
+₱130,000 paid / a next-payment date), confirmed the summary strip's
+four totals computed correctly (Committed used the actual figure,
+Outstanding = committed − paid), confirmed the row's payment badge
+read "₱130,000 due Nov 1, 2026", clicked "Mark paid in full" and
+confirmed Paid caught up to ₱260,000, Outstanding dropped to ₱0, and
+the button itself disappeared (nothing left to settle). Submitted a
+non-numeric amount and confirmed a clean error banner with no bad row
+inserted. Test data deleted after. `npm run build` clean; `npm run
+verify:rls` extended with 4 new checks — budget isolation, cross-
+engagement read-by-id, cross-engagement insert blocked, couple CAN
+record a payment on their own line (56 total, all passing).
