@@ -42,7 +42,50 @@ export async function submitVendorApplication(formData: FormData) {
     throw e;
   }
 
+  const contactEmail = (formData.get("contact_email") as string) || null;
+  const password = (formData.get("password") as string) || "";
+
   const admin = createAdminClient();
+
+  // Optional login, per docs/ever-after-auth-and-access.md §2's "Vendor
+  // — self-registers". Creating the auth user BEFORE the vendors row, and
+  // bailing out on failure before any vendors row exists, avoids a
+  // listing that looks signed-up-with-a-password but has no working
+  // login (e.g. a duplicate email). Promotion to global_role = 'vendor'
+  // is a separate explicit update after the user exists — never trusted
+  // signup metadata — the exact discipline migration 0007 established
+  // and scripts/create-account-user.mjs already follows for 'account'.
+  let ownerUserId: string | null = null;
+  if (password) {
+    if (!contactEmail) {
+      redirect(
+        `/directory/apply?error=${encodeURIComponent("Contact email is required to set a password.")}`,
+      );
+    }
+    if (password.length < 6) {
+      redirect(
+        `/directory/apply?error=${encodeURIComponent("Password must be at least 6 characters.")}`,
+      );
+    }
+
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email: contactEmail,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: business_name },
+    });
+
+    if (createError || !created?.user) {
+      redirect(
+        `/directory/apply?error=${encodeURIComponent(
+          createError?.message ?? "Could not create your login. Please try again.",
+        )}`,
+      );
+    }
+
+    ownerUserId = created.user.id;
+    await admin.from("users").update({ global_role: "vendor" }).eq("id", ownerUserId);
+  }
 
   const { data: vendor, error } = await admin
     .from("vendors")
@@ -54,13 +97,17 @@ export async function submitVendorApplication(formData: FormData) {
       rate_to: rateTo,
       rate_note: (formData.get("rate_note") as string) || null,
       contact_phone: (formData.get("contact_phone") as string) || null,
-      contact_email: (formData.get("contact_email") as string) || null,
+      contact_email: contactEmail,
       status: "pending",
+      owner_user_id: ownerUserId,
     })
     .select("id")
     .single();
 
   if (error || !vendor) {
+    if (ownerUserId) {
+      await admin.auth.admin.deleteUser(ownerUserId);
+    }
     redirect(
       `/directory/apply?error=${encodeURIComponent("Something went wrong. Please try again.")}`,
     );
@@ -76,5 +123,5 @@ export async function submitVendorApplication(formData: FormData) {
     );
   }
 
-  redirect("/directory/apply?submitted=1");
+  redirect(`/directory/apply?submitted=1${ownerUserId ? "&withLogin=1" : ""}`);
 }

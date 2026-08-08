@@ -24,6 +24,13 @@ export default async function AppLayout({
     .eq("id", user.id)
     .single();
 
+  // A vendor never belongs in the internal-tool workspace — RLS already
+  // hides every engagement/guest from them here, but they shouldn't see
+  // this chrome at all, only their own listing.
+  if (profile?.global_role === "vendor") {
+    redirect("/vendor/profile");
+  }
+
   return (
     <div className="min-h-screen bg-neutral-50">
       <header className="border-b border-neutral-200 bg-white">

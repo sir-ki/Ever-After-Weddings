@@ -8,7 +8,7 @@ export async function signIn(formData: FormData) {
   const password = formData.get("password") as string;
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -17,7 +17,16 @@ export async function signIn(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(error.message)}`);
   }
 
-  redirect("/dashboard");
+  // Vendor is the one role that never lands in the internal-tool
+  // workspace — (app)/layout.tsx would just redirect it there anyway,
+  // this just skips the bounce.
+  const { data: profile } = await supabase
+    .from("users")
+    .select("global_role")
+    .eq("id", data.user.id)
+    .single();
+
+  redirect(profile?.global_role === "vendor" ? "/vendor/profile" : "/dashboard");
 }
 
 export async function signOut() {

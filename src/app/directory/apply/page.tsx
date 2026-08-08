@@ -14,9 +14,9 @@ const CATEGORIES = [
 export default async function VendorApplyPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; submitted?: string }>;
+  searchParams: Promise<{ error?: string; submitted?: string; withLogin?: string }>;
 }) {
-  const { error, submitted } = await searchParams;
+  const { error, submitted, withLogin } = await searchParams;
 
   if (submitted) {
     return (
@@ -25,6 +25,15 @@ export default async function VendorApplyPage({
         <p className="mt-2 text-sm text-neutral-500">
           We&apos;ll be in touch once your listing has been reviewed.
         </p>
+        {withLogin && (
+          <p className="mt-4 text-sm text-neutral-500">
+            You can{" "}
+            <a href="/login" className="text-neutral-900 underline">
+              sign in
+            </a>{" "}
+            anytime to edit your listing.
+          </p>
+        )}
       </div>
     );
   }
@@ -92,6 +101,26 @@ export default async function VendorApplyPage({
         <div>
           <label className={labelClass}>Photo URLs (one per line)</label>
           <textarea name="photo_urls" rows={4} className={`${inputClass} font-mono`} />
+        </div>
+
+        <div className="border-t border-neutral-200 pt-4">
+          <p className="mb-3 text-sm font-medium text-neutral-700">
+            Want to log in and edit this listing later? Set a password (optional).
+          </p>
+          <div>
+            <label className={labelClass}>Password</label>
+            <input
+              name="password"
+              type="password"
+              minLength={6}
+              autoComplete="new-password"
+              placeholder="Leave blank to skip — we'll manage your listing for you"
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-neutral-400">
+              Uses your contact email above to sign in. At least 6 characters.
+            </p>
+          </div>
         </div>
 
         {error && (

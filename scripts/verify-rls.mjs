@@ -539,6 +539,114 @@ try {
   await admin.from("vendors").delete().eq("id", approvedVendor.id);
 }
 
+// Vendor self-service login (0019_vendor_login.sql): a vendor can read/
+// write their own row and photos, cannot touch another vendor's, and —
+// the actual point of the trigger — cannot self-approve their own
+// listing even by writing status directly.
+const vendorLoginEmail = `rls-test-vendor-${Date.now()}@example.com`;
+const vendorLoginPassword = "verify-rls-temp-password-1234";
+const { data: createdVendorUser, error: createVendorUserError } = await admin.auth.admin.createUser({
+  email: vendorLoginEmail,
+  password: vendorLoginPassword,
+  email_confirm: true,
+  user_metadata: { full_name: "RLS Test Vendor" },
+});
+if (createVendorUserError) {
+  console.error("Failed to create test vendor login:", createVendorUserError.message);
+  process.exit(1);
+}
+const vendorUserId = createdVendorUser.user.id;
+await admin.from("users").update({ global_role: "vendor" }).eq("id", vendorUserId);
+
+const { data: ownVendor } = await admin
+  .from("vendors")
+  .insert({
+    business_name: "RLS Test Owned Vendor",
+    category: "music",
+    status: "pending",
+    owner_user_id: vendorUserId,
+  })
+  .select("id")
+  .single();
+const { data: otherVendor } = await admin
+  .from("vendors")
+  .insert({ business_name: "RLS Test Other Vendor", category: "cake", status: "pending" })
+  .select("id")
+  .single();
+const { data: ownVendorPhoto } = await admin
+  .from("vendor_photos")
+  .insert({ vendor_id: ownVendor.id, photo_url: "https://example.com/rls-test.jpg" })
+  .select("id")
+  .single();
+
+try {
+  const asVendor = createClient(url, anonKey);
+  const { error: vendorSignInError } = await asVendor.auth.signInWithPassword({
+    email: vendorLoginEmail,
+    password: vendorLoginPassword,
+  });
+  if (vendorSignInError) {
+    console.error("Failed to sign in as test vendor:", vendorSignInError.message);
+    process.exit(1);
+  }
+
+  const { data: ownRead } = await asVendor
+    .from("vendors")
+    .select("id")
+    .eq("id", ownVendor.id)
+    .maybeSingle();
+  check("a pending vendor can read their own row", ownRead?.id === ownVendor.id);
+
+  const { data: ownUpdate, error: ownUpdateError } = await asVendor
+    .from("vendors")
+    .update({ business_name: "Updated by owner" })
+    .eq("id", ownVendor.id)
+    .select("business_name")
+    .maybeSingle();
+  check(
+    "a vendor CAN edit their own listing",
+    !ownUpdateError && ownUpdate?.business_name === "Updated by owner",
+  );
+
+  const { data: selfApproveAttempt } = await asVendor
+    .from("vendors")
+    .update({ status: "approved" })
+    .eq("id", ownVendor.id)
+    .select("status")
+    .maybeSingle();
+  check(
+    "a vendor cannot self-approve their own listing",
+    selfApproveAttempt?.status === "pending",
+  );
+
+  await asVendor
+    .from("vendors")
+    .update({ business_name: "should not be allowed" })
+    .eq("id", otherVendor.id);
+  const { data: otherVendorAfter } = await admin
+    .from("vendors")
+    .select("business_name")
+    .eq("id", otherVendor.id)
+    .single();
+  check(
+    "a vendor cannot edit another vendor's listing",
+    otherVendorAfter?.business_name !== "should not be allowed",
+  );
+
+  const { data: ownPhotoUpdate } = await asVendor
+    .from("vendor_photos")
+    .update({ photo_url: "https://example.com/updated.jpg" })
+    .eq("id", ownVendorPhoto.id)
+    .select("id")
+    .maybeSingle();
+  check("a vendor CAN edit their own photos", !!ownPhotoUpdate);
+} finally {
+  await admin.from("vendor_photos").delete().eq("id", ownVendorPhoto.id);
+  await admin.from("vendors").delete().eq("id", ownVendor.id);
+  await admin.from("vendors").delete().eq("id", otherVendor.id);
+  await admin.auth.admin.deleteUser(vendorUserId);
+}
+
 // Milestone 7: checkpoints / guest_scans isolation. Never added when M7
 // shipped (see handoff §6/§7) — in particular this is the only script that
 // exercises the guest_scans_all policy's cross-engagement guard added in

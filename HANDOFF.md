@@ -64,6 +64,18 @@ add-from-template). Unlike every other `engagements`-level field,
 `checklist_items` is a brand-new table with a real couple-write RLS
 policy, not an Account-only one.
 
+**2026-08-04: checklist deep links, budget tracking, and vendor
+self-service login all shipped.** Checklist items can now link to the
+workspace tab they're about (§21). Budget tracking (§22) is a new
+`budget_items` table — estimated/actual/paid amounts per line, a
+summary strip, real couple-write RLS, deliberately kept separate from
+the checklist per that spec's own §1. Vendor self-service login (§23)
+closes the gap M8 left open on purpose — a real `global_role =
+'vendor'` account, `/vendor/profile`, and the `vendors_owner_write`
+RLS policy the auth doc sketched from day one but never shipped, plus a
+trigger closing the self-approval hole a bare ownership policy would
+have left open.
+
 ---
 
 ## 1. Live pieces
@@ -438,7 +450,7 @@ not a quick patch.
   structure are verified programmatically (§13); an actual print of the
   attendee sheet and place cards is the one piece not yet done.
 - **Coordinator "who to ask" block** on the day-of hub only renders if an `engagement_members` row with `role = 'coordinator'` exists *and* that user's `users.phone` is filled in. `/profile` (added 2026-08-02) lets any signed-in user set their own phone, and the member-invite flow (§11) now provides a real way to attach a coordinator — this block should light up for any engagement with an invited, phone-having coordinator; still dark for the two original seed engagements since their members were only ever added via SQL.
-- **No vendor self-service login or editor** — deliberate M8 scope decision, see §5. Adding it later is additive (the schema already has `vendors.owner_user_id`), not a rework.
+- ~~No vendor self-service login or editor~~ — **built 2026-08-04, see §23.**
 - ~~A handful of Minor-severity findings from M8's task reviews were deliberately deferred~~ — **fixed 2026-08-02**: non-numeric `rate_from`/`rate_to` now redirects with an error instead of silently becoming `null` (`src/lib/parse-rate.ts`, used by both `directory/apply/actions.ts` and `(app)/vendors/actions.ts`); the per-event vendor log's off-platform `business_name` is now required server-side (`(app)/engagements/[id]/vendors/actions.ts`); notes on a directory-linked vendor-log entry are no longer discarded (both insert branches now pass `notes` through); `/directory`'s card grid is now `grid-cols-1 sm:grid-cols-2`. Fixing the required-field/rate validation surfaced a small pre-existing gap in the same code — action success paths only called `revalidatePath`, never `redirect`, so a prior error left in the URL's `?error=` param would stick around after a subsequent successful submit; both `addEngagementVendor` and `updateVendor` now redirect on success too.
 - **Physical print + camera scan test still owed** (Part 3's own done-when). QR decode correctness is proven by script (`verify-invitation-card.mjs`, using the scanner's actual `jsqr`/`extractToken()` logic), but no environment used for this project so far has had a printer or camera — a real print-and-scan against the live M7 scanner is still worth doing once someone has both.
 
@@ -1440,3 +1452,79 @@ inserted. Test data deleted after. `npm run build` clean; `npm run
 verify:rls` extended with 4 new checks — budget isolation, cross-
 engagement read-by-id, cross-engagement insert blocked, couple CAN
 record a payment on their own line (56 total, all passing).
+
+---
+
+## 23. Vendor self-service login (2026-08-04)
+
+Closes the gap M8 deliberately left open (§5, §7) — a real
+`global_role = 'vendor'` login, exactly as `docs/ever-after-auth-and-
+access.md` §2/§4 sketched from day one but M8 chose not to build
+("avoids building an entire authenticated portal for the build plan's
+lowest-priority milestone"). `vendors.owner_user_id` was left nullable
+in the schema specifically so this would be additive, not a rework —
+it was.
+
+**No new trust surface — the exact discipline migration `0007`
+established, reused.** `handle_new_user()` still always creates a
+signup as `'couple'` and never reads any client-supplied metadata for
+role. `/directory/apply`'s form gained an optional password field;
+when set, the server action creates the auth user first (admin API),
+then does an explicit follow-up `update users set global_role =
+'vendor'` — the same two-step promotion `scripts/create-account-user.mjs`
+already uses for `'account'`. If the `vendors` row insert then fails,
+the just-created auth user is deleted rather than left as an orphaned
+login with no listing.
+
+**The RLS policy the auth doc sketched but never shipped, now
+written — plus the piece the sketch didn't cover.**
+`vendors_owner_write` (migration `0019_vendor_login.sql`) is exactly
+what §4 of the auth doc proposed: `owner_user_id = auth.uid()` on
+both `using` and `with check`. That alone would let a vendor PATCH
+their own `status` to `'approved'` directly via the API, bypassing
+Account review entirely — the same class of bug `0007` fixed (a
+client-writable privilege column), just on a different table. Fixed
+with a trigger, `lock_vendor_self_approval`, same shape as
+`0010`/`0011`'s `lock_self_update_sensitive_columns`: any non-Account
+write unconditionally drops `status` back to `'pending'`. That
+trigger does double duty — it's also exactly what the auth doc's own
+note asks for ("any edit to an approved listing should arguably drop
+it back to pending"), so no separate application-layer logic needed
+to compute that. Gated on `auth.role() = 'authenticated'`, not `not
+is_account()` — the precise lesson `0011`'s own bug already
+documents, since the latter is also true for the service-role client
+and would've silently broken Account's own approve/reject actions.
+
+**`vendor_photos` got the same ownership policy** — "their own row
+and its photos" per the auth doc's own phrasing. `/vendor/profile`'s
+photo editing is replace-all (delete every row, reinsert from a
+newline-separated textarea), same simplicity `/directory/apply`
+already uses — no per-photo edit UI.
+
+**New route, deliberately outside `(app)/*`**: `/vendor/profile` has
+its own minimal layout, not the internal-tool chrome — a vendor must
+never see engagement/guest data even as unreachable-but-visible UI
+chrome, on top of RLS already blocking the data itself. `(app)/
+layout.tsx` gained a guard that redirects a vendor straight back out
+if they ever land there; `login/actions.ts`'s `signIn` is now
+role-aware, landing a vendor on `/vendor/profile` instead of
+`/dashboard` directly, so the redirect-away is a defense-in-depth
+backstop rather than the normal path.
+
+**Verified live**, full loop through the real forms, not just RLS:
+applied via `/directory/apply` with a password set, confirmed the
+"you can sign in" message appeared, signed in and landed directly on
+`/vendor/profile` (not `/dashboard`), confirmed visiting `/dashboard`
+directly bounced straight back. Approved the listing (service client,
+standing in for an Account approval), saved an edit through the real
+form, and confirmed the status flipped `approved` → `pending`
+automatically with no application code involved — the trigger, not
+application logic, is what's actually protecting this. Confirmed the
+edited description and replaced photo list both persisted. All test
+data (vendor row, photos, auth user) deleted after. Hit the
+documented `document.forms[0]` gotcha (§11) again — the sign-out
+form is first in DOM on `/vendor/profile` too — same fix, select by a
+distinguishing field name instead. `npm run build` clean; `npm run
+verify:rls` extended with 5 new checks — own-row read/write, cannot
+touch another vendor's row, **cannot self-approve even by writing
+`status` directly**, own-photo write (61 total, all passing).
