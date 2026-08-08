@@ -463,11 +463,14 @@ admin API — there's no public signup path for that role, by design.
 
 **`NEXT_PUBLIC_SITE_URL`** (added 2026-08-02, launch-readiness Part 1) —
 used to build absolute copyable links (invite links, invitation-card QR
-payloads). Set to `http://localhost:3000` in local `.env.local`; **must
-also be set in the Vercel project's environment variables**
-(`https://ever-after-weddings-seven.vercel.app`) or copy-link/QR features
-will point at localhost in production. Not yet confirmed set there as of
-this writing — check before relying on either feature live.
+payloads). Set to `http://localhost:3000` in local `.env.local`, and
+**set in Vercel Production as of 2026-08-04**
+(`https://ever-after-weddings-seven.vercel.app`, via `vercel env add`)
+— was missing since Part 1 shipped, meaning every copy-link/QR feature
+was silently pointing at localhost in production until this. Fixed by
+adding the var and redeploying (`NEXT_PUBLIC_*` vars bake in at build
+time, so adding it alone doesn't retroactively fix an already-built
+deployment).
 
 **Testing as Account/couple in this environment**: there's no saved
 password for the one real Account login
